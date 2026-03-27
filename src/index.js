@@ -10,8 +10,8 @@ const RETRY_DELAY_MS = 15 * 60 * 1000;
 const SENT_GAMES_PATH = join(__dirname, "..", "sent-games.json");
 const MARINERS_VIDEO_URL = "https://www.mlb.com/mariners/video";
 
-function getToday() {
-  if (process.env.DATE_OVERRIDE) return process.env.DATE_OVERRIDE;
+function getDatesToCheck() {
+  if (process.env.DATE_OVERRIDE) return [process.env.DATE_OVERRIDE];
 
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -19,7 +19,11 @@ function getToday() {
     month: "2-digit",
     day: "2-digit",
   });
-  return formatter.format(new Date());
+
+  const now = new Date();
+  const today = formatter.format(now);
+  const yesterday = formatter.format(new Date(now.getTime() - 86400000));
+  return [today, yesterday];
 }
 
 function formatDisplayDate(dateStr) {
@@ -164,28 +168,32 @@ function sleep(ms) {
 }
 
 async function main() {
-  const dateStr = getToday();
-  let scheduleData = await fetchSchedule(dateStr);
-  const finalGames = extractFinalGames(scheduleData);
-
-  if (finalGames.length === 0) {
-    console.log("No final Mariners game today.");
-    return;
-  }
-
-  console.log(`Found ${finalGames.length} final game(s).`);
-
+  const dates = getDatesToCheck();
   const sentGames = await loadSentGames();
-  const newGames = finalGames.filter((g) => !sentGames.includes(g.gamePk));
 
-  if (newGames.length === 0) {
-    console.log("All games already emailed.");
+  // Collect final games from today and yesterday (catches late-finishing games)
+  const allNewGames = [];
+  for (const dateStr of dates) {
+    const scheduleData = await fetchSchedule(dateStr);
+    const finalGames = extractFinalGames(scheduleData);
+
+    for (const game of finalGames) {
+      if (!sentGames.includes(game.gamePk)) {
+        allNewGames.push({ game, dateStr });
+      }
+    }
+  }
+
+  if (allNewGames.length === 0) {
+    console.log("No new final Mariners games to process.");
     return;
   }
+
+  console.log(`Found ${allNewGames.length} new final game(s) to process.`);
 
   const results = [];
 
-  for (const game of newGames) {
+  for (const { game, dateStr } of allNewGames) {
     let currentGame = game;
     let url = null;
 
@@ -199,19 +207,21 @@ async function main() {
             `retry ${attempt}/${MAX_RETRIES} in 15 min...`
         );
         await sleep(RETRY_DELAY_MS);
-        scheduleData = await fetchSchedule(dateStr);
+        const freshData = await fetchSchedule(dateStr);
         currentGame =
-          scheduleData.dates?.[0]?.games?.find(
+          freshData.dates?.[0]?.games?.find(
             (g) => g.gamePk === game.gamePk
           ) || currentGame;
       }
     }
 
-    results.push({ gamePk: game.gamePk, url });
+    results.push({ gamePk: game.gamePk, url, dateStr });
   }
 
-  const subject = `Mariners Highlights \u2014 ${formatDisplayDate(dateStr)}`;
-  const html = buildEmailHtml(dateStr, results);
+  // Use the game's scheduled date for the email subject
+  const primaryDate = results[0].dateStr;
+  const subject = `Mariners Highlights \u2014 ${formatDisplayDate(primaryDate)}`;
+  const html = buildEmailHtml(primaryDate, results);
   await sendEmail(subject, html);
 
   const updatedSentGames = [...sentGames, ...results.map((r) => r.gamePk)];
