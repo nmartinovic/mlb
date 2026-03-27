@@ -1,4 +1,3 @@
-import { Resend } from "resend";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -138,16 +137,24 @@ async function sendEmail(subject, html) {
     return;
   }
 
-  const resend = new Resend(process.env.EMAIL_API_KEY);
-  const { error } = await resend.emails.send({
-    from: process.env.FROM_EMAIL,
-    to: process.env.RECIPIENT_EMAIL,
-    subject,
-    html,
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": process.env.EMAIL_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: { email: process.env.FROM_EMAIL },
+      to: [{ email: process.env.RECIPIENT_EMAIL }],
+      subject,
+      htmlContent: html,
+    }),
   });
 
-  if (error) {
-    throw new Error(`Resend API error: ${JSON.stringify(error)}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Brevo API error (${res.status}): ${body.slice(0, 300)}`);
   }
   console.log(`Email sent to ${process.env.RECIPIENT_EMAIL}.`);
 }

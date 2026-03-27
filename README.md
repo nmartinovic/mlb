@@ -6,9 +6,9 @@ No scores. No opponents. No spoilers. Just a link.
 
 ## Setup
 
-### 1. Create a Resend account
+### 1. Create a Brevo account
 
-Sign up at [resend.com](https://resend.com) and verify a sender domain. The free tier (100 emails/day) is more than enough.
+Sign up at [brevo.com](https://www.brevo.com) and get an API key from **SMTP & API > API Keys**. The free tier (300 emails/day) is more than enough.
 
 ### 2. Configure GitHub Secrets
 
@@ -16,7 +16,7 @@ In your repo, go to **Settings > Secrets and variables > Actions** and add:
 
 | Secret | Description |
 |---|---|
-| `EMAIL_API_KEY` | Your Resend API key |
+| `EMAIL_API_KEY` | Your Brevo API key |
 | `RECIPIENT_EMAIL` | Email address to receive highlights |
 | `FROM_EMAIL` | Verified sender address (e.g. `highlights@yourdomain.com`) |
 
@@ -46,7 +46,7 @@ DATE_OVERRIDE=2025-06-15 DRY_RUN=true npm start
 
 # Send a real email for a past game
 DATE_OVERRIDE=2025-06-15 \
-  EMAIL_API_KEY=re_xxxxx \
+  EMAIL_API_KEY=xkeysib-xxxxx \
   RECIPIENT_EMAIL=you@example.com \
   FROM_EMAIL=highlights@yourdomain.com \
   npm start
