@@ -72,11 +72,21 @@ function extractHighlightUrl(game) {
     return null;
   }
 
-  const recap =
-    items.find((item) => /recap|condensed|cg:/i.test(item.title || item.headline)) ||
+  console.log(
+    `Available highlight items for game ${game.gamePk}: ` +
+      items.map((i) => `"${i.title || i.headline}"`).join(", ")
+  );
+
+  // Prefer shorter highlights/condensed game over the longer recap
+  const selected =
+    items.find((item) => /condensed|cg:/i.test(item.title || item.headline)) ||
+    items.find((item) => /highlight/i.test(item.title || item.headline)) ||
+    items.find((item) => /recap/i.test(item.title || item.headline)) ||
     items[0];
 
-  const playbacks = recap?.playbacks;
+  console.log(`Selected: "${selected.title || selected.headline}"`);
+
+  const playbacks = selected?.playbacks;
   if (!playbacks?.length) {
     console.log(`Highlight item found but no playbacks for game ${game.gamePk}.`);
     return null;
