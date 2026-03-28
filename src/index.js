@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TEAM_ID = 136;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;  // TODO: restore to 3 after debugging
 const RETRY_DELAY_MS = 15 * 60 * 1000;
 const SENT_GAMES_PATH = join(__dirname, "..", "sent-games.json");
 const MARINERS_VIDEO_URL = "https://www.mlb.com/mariners/video";
@@ -76,8 +76,7 @@ async function fetchGameContent(gamePk) {
 }
 
 function extractHighlightUrl(content, gamePk) {
-  // The condensed game recap lives in content.highlights.highlights.items
-  // alongside individual play clips. We need to find the "Condensed Game" item.
+  // DEBUG: dump item metadata to identify the game recap video
   const items = content?.highlights?.highlights?.items;
 
   if (!items?.length) {
@@ -85,36 +84,20 @@ function extractHighlightUrl(content, gamePk) {
     return null;
   }
 
-  console.log(
-    `Available items for game ${gamePk}: ` +
-      items.map((i) => `"${i.title || i.headline}"`).join(", ")
-  );
-
-  // Look for the condensed game recap (e.g. "Condensed Game: CLE@SEA - 3/27/26")
-  const condensed = items.find((item) =>
-    /condensed game/i.test(item.title || item.headline)
-  );
-
-  if (!condensed) {
-    console.log(`No "Condensed Game" item found for game ${gamePk}.`);
-    return null;
+  for (const item of items) {
+    console.log(JSON.stringify({
+      title: item.title || item.headline,
+      type: item.type,
+      slug: item.slug,
+      blurb: item.blurb,
+      duration: item.duration,
+      keywordsType: item.keywordsAll?.map((k) => `${k.type}:${k.value}`).slice(0, 5),
+    }));
   }
 
-  console.log(`Selected: "${condensed.title || condensed.headline}"`);
-
-  const playbacks = condensed?.playbacks;
-  if (!playbacks?.length) {
-    console.log(`Condensed game item found but no playbacks for game ${gamePk}.`);
-    return null;
-  }
-
-  const preferred = playbacks.find((p) => /mp4Avc|2500K/i.test(p.name));
-  const url = preferred?.url || playbacks[playbacks.length - 1]?.url;
-
-  if (url) {
-    console.log(`Found highlight URL for game ${gamePk}: ${url}`);
-  }
-  return url || null;
+  // Placeholder — will be updated once we know how to identify the recap
+  console.log(`Diagnostic run — no video selected for game ${gamePk}.`);
+  return null;
 }
 
 async function loadSentGames() {
