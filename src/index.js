@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TEAM_ID = 136;
-const MAX_RETRIES = 1;  // TODO: restore to 3 after debugging
+const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 15 * 60 * 1000;
 const SENT_GAMES_PATH = join(__dirname, "..", "sent-games.json");
 const MARINERS_VIDEO_URL = "https://www.mlb.com/mariners/video";
@@ -76,58 +76,35 @@ async function fetchGameContent(gamePk) {
 }
 
 function extractHighlightUrl(content, gamePk) {
-  // The full game highlights video lives in media.epg, not in
-  // highlights.highlights.items (which contains individual play clips).
-  const epg = content?.media?.epg;
+  // The condensed game recap lives in content.highlights.highlights.items
+  // alongside individual play clips. We need to find the "Condensed Game" item.
+  const items = content?.highlights?.highlights?.items;
 
-  // Dump the content structure so we can see what the API actually returns
-  console.log(`Content top-level keys: ${JSON.stringify(Object.keys(content || {}))}`);
-  console.log(`Content.media keys: ${JSON.stringify(Object.keys(content?.media || {}))}`);
-  console.log(`Content.highlights keys: ${JSON.stringify(Object.keys(content?.highlights || {}))}`);
-  if (content?.highlights?.highlights?.items?.length) {
-    console.log(
-      `Content.highlights.highlights.items: ` +
-        content.highlights.highlights.items.slice(0, 5).map((i) => `"${i.title || i.headline}"`).join(", ")
-    );
-  }
-  if (content?.media?.epg?.length) {
-    console.log(`Content.media.epg titles: ${content.media.epg.map((e) => `"${e.title}"`).join(", ")}`);
-  }
-  if (content?.media?.epgAlternate?.length) {
-    console.log(`Content.media.epgAlternate titles: ${content.media.epgAlternate.map((e) => `"${e.title}"`).join(", ")}`);
-  }
-
-  if (!epg?.length) {
-    console.log(`No media.epg found for game ${gamePk}.`);
+  if (!items?.length) {
+    console.log(`No highlight items found for game ${gamePk}.`);
     return null;
   }
 
   console.log(
-    `Available EPG categories for game ${gamePk}: ` +
-      epg.map((e) => `"${e.title}"`).join(", ")
+    `Available items for game ${gamePk}: ` +
+      items.map((i) => `"${i.title || i.headline}"`).join(", ")
   );
 
-  // Look for the game highlights / recap section in EPG
-  const highlightsSection =
-    epg.find((e) => /highlight/i.test(e.title)) ||
-    epg.find((e) => /condensed/i.test(e.title)) ||
-    epg.find((e) => /recap/i.test(e.title));
+  // Look for the condensed game recap (e.g. "Condensed Game: CLE@SEA - 3/27/26")
+  const condensed = items.find((item) =>
+    /condensed game/i.test(item.title || item.headline)
+  );
 
-  if (!highlightsSection?.items?.length) {
-    console.log(`No game highlights video found in EPG for game ${gamePk}.`);
+  if (!condensed) {
+    console.log(`No "Condensed Game" item found for game ${gamePk}.`);
     return null;
   }
 
-  console.log(
-    `EPG items in "${highlightsSection.title}": ` +
-      highlightsSection.items.map((i) => `"${i.title || i.headline || i.description || "untitled"}"`).join(", ")
-  );
+  console.log(`Selected: "${condensed.title || condensed.headline}"`);
 
-  const item = highlightsSection.items[0];
-  const playbacks = item?.playbacks;
-
+  const playbacks = condensed?.playbacks;
   if (!playbacks?.length) {
-    console.log(`Highlight item found but no playbacks for game ${gamePk}.`);
+    console.log(`Condensed game item found but no playbacks for game ${gamePk}.`);
     return null;
   }
 
