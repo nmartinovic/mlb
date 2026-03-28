@@ -37,7 +37,7 @@ function formatDisplayDate(dateStr) {
 }
 
 function scheduleUrl(dateStr) {
-  return `https://statsapi.mlb.com/api/v1/schedule?teamId=${TEAM_ID}&date=${dateStr}&sportId=1&hydrate=game(content(highlights(highlights(items))))`;
+  return `https://statsapi.mlb.com/api/v1/schedule?teamId=${TEAM_ID}&date=${dateStr}&sportId=1`;
 }
 
 async function fetchSchedule(dateStr) {
@@ -61,34 +61,56 @@ function extractFinalGames(scheduleData) {
   );
 }
 
-function extractHighlightUrl(game) {
-  const items = game?.content?.highlights?.highlights?.items;
+async function fetchGameContent(gamePk) {
+  const url = `https://statsapi.mlb.com/api/v1/game/${gamePk}/content`;
+  console.log(`Fetching game content for ${gamePk}...`);
 
-  if (!items?.length) {
-    console.log(
-      `No highlight items found for game ${game.gamePk}. ` +
-        `content keys: ${JSON.stringify(Object.keys(game?.content || {}))}`
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `MLB content API returned ${res.status}: ${body.slice(0, 200)}`
     );
+  }
+  return res.json();
+}
+
+function extractHighlightUrl(content, gamePk) {
+  // The full game highlights video lives in media.epg, not in
+  // highlights.highlights.items (which contains individual play clips).
+  const epg = content?.media?.epg;
+
+  if (!epg?.length) {
+    console.log(`No media.epg found for game ${gamePk}.`);
     return null;
   }
 
   console.log(
-    `Available highlight items for game ${game.gamePk}: ` +
-      items.map((i) => `"${i.title || i.headline}"`).join(", ")
+    `Available EPG categories for game ${gamePk}: ` +
+      epg.map((e) => `"${e.title}"`).join(", ")
   );
 
-  // Prefer shorter highlights/condensed game over the longer recap
-  const selected =
-    items.find((item) => /condensed|cg:/i.test(item.title || item.headline)) ||
-    items.find((item) => /highlight/i.test(item.title || item.headline)) ||
-    items.find((item) => /recap/i.test(item.title || item.headline)) ||
-    items[0];
+  // Look for the game highlights / recap section in EPG
+  const highlightsSection =
+    epg.find((e) => /highlight/i.test(e.title)) ||
+    epg.find((e) => /condensed/i.test(e.title)) ||
+    epg.find((e) => /recap/i.test(e.title));
 
-  console.log(`Selected: "${selected.title || selected.headline}"`);
+  if (!highlightsSection?.items?.length) {
+    console.log(`No game highlights video found in EPG for game ${gamePk}.`);
+    return null;
+  }
 
-  const playbacks = selected?.playbacks;
+  console.log(
+    `EPG items in "${highlightsSection.title}": ` +
+      highlightsSection.items.map((i) => `"${i.title || i.headline || i.description || "untitled"}"`).join(", ")
+  );
+
+  const item = highlightsSection.items[0];
+  const playbacks = item?.playbacks;
+
   if (!playbacks?.length) {
-    console.log(`Highlight item found but no playbacks for game ${game.gamePk}.`);
+    console.log(`Highlight item found but no playbacks for game ${gamePk}.`);
     return null;
   }
 
@@ -96,7 +118,7 @@ function extractHighlightUrl(game) {
   const url = preferred?.url || playbacks[playbacks.length - 1]?.url;
 
   if (url) {
-    console.log(`Found highlight URL for game ${game.gamePk}: ${url}`);
+    console.log(`Found highlight URL for game ${gamePk}: ${url}`);
   }
   return url || null;
 }
@@ -204,11 +226,11 @@ async function main() {
   const results = [];
 
   for (const { game, dateStr } of allNewGames) {
-    let currentGame = game;
     let url = null;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      url = extractHighlightUrl(currentGame);
+      const content = await fetchGameContent(game.gamePk);
+      url = extractHighlightUrl(content, game.gamePk);
       if (url) break;
 
       if (attempt < MAX_RETRIES) {
@@ -217,11 +239,6 @@ async function main() {
             `retry ${attempt}/${MAX_RETRIES} in 15 min...`
         );
         await sleep(RETRY_DELAY_MS);
-        const freshData = await fetchSchedule(dateStr);
-        currentGame =
-          freshData.dates?.[0]?.games?.find(
-            (g) => g.gamePk === game.gamePk
-          ) || currentGame;
       }
     }
 
