@@ -76,68 +76,28 @@ async function fetchGameContent(gamePk) {
 }
 
 function extractHighlightUrl(content, gamePk) {
-  // The full game highlights video lives in media.epg, not in
-  // highlights.highlights.items (which contains individual play clips).
-  const epg = content?.media?.epg;
+  // DEBUG: dump item metadata to identify the game recap video
+  const items = content?.highlights?.highlights?.items;
 
-  // Dump the content structure so we can see what the API actually returns
-  console.log(`Content top-level keys: ${JSON.stringify(Object.keys(content || {}))}`);
-  console.log(`Content.media keys: ${JSON.stringify(Object.keys(content?.media || {}))}`);
-  console.log(`Content.highlights keys: ${JSON.stringify(Object.keys(content?.highlights || {}))}`);
-  if (content?.highlights?.highlights?.items?.length) {
-    console.log(
-      `Content.highlights.highlights.items: ` +
-        content.highlights.highlights.items.slice(0, 5).map((i) => `"${i.title || i.headline}"`).join(", ")
-    );
-  }
-  if (content?.media?.epg?.length) {
-    console.log(`Content.media.epg titles: ${content.media.epg.map((e) => `"${e.title}"`).join(", ")}`);
-  }
-  if (content?.media?.epgAlternate?.length) {
-    console.log(`Content.media.epgAlternate titles: ${content.media.epgAlternate.map((e) => `"${e.title}"`).join(", ")}`);
-  }
-
-  if (!epg?.length) {
-    console.log(`No media.epg found for game ${gamePk}.`);
+  if (!items?.length) {
+    console.log(`No highlight items found for game ${gamePk}.`);
     return null;
   }
 
-  console.log(
-    `Available EPG categories for game ${gamePk}: ` +
-      epg.map((e) => `"${e.title}"`).join(", ")
-  );
-
-  // Look for the game highlights / recap section in EPG
-  const highlightsSection =
-    epg.find((e) => /highlight/i.test(e.title)) ||
-    epg.find((e) => /condensed/i.test(e.title)) ||
-    epg.find((e) => /recap/i.test(e.title));
-
-  if (!highlightsSection?.items?.length) {
-    console.log(`No game highlights video found in EPG for game ${gamePk}.`);
-    return null;
+  for (const item of items) {
+    console.log(JSON.stringify({
+      title: item.title || item.headline,
+      type: item.type,
+      slug: item.slug,
+      blurb: item.blurb,
+      duration: item.duration,
+      keywordsType: item.keywordsAll?.map((k) => `${k.type}:${k.value}`).slice(0, 5),
+    }));
   }
 
-  console.log(
-    `EPG items in "${highlightsSection.title}": ` +
-      highlightsSection.items.map((i) => `"${i.title || i.headline || i.description || "untitled"}"`).join(", ")
-  );
-
-  const item = highlightsSection.items[0];
-  const playbacks = item?.playbacks;
-
-  if (!playbacks?.length) {
-    console.log(`Highlight item found but no playbacks for game ${gamePk}.`);
-    return null;
-  }
-
-  const preferred = playbacks.find((p) => /mp4Avc|2500K/i.test(p.name));
-  const url = preferred?.url || playbacks[playbacks.length - 1]?.url;
-
-  if (url) {
-    console.log(`Found highlight URL for game ${gamePk}: ${url}`);
-  }
-  return url || null;
+  // Placeholder — will be updated once we know how to identify the recap
+  console.log(`Diagnostic run — no video selected for game ${gamePk}.`);
+  return null;
 }
 
 async function loadSentGames() {
