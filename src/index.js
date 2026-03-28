@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TEAM_ID = 136;
-const MAX_RETRIES = 1;  // TODO: restore to 3 after debugging
+const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 15 * 60 * 1000;
 const SENT_GAMES_PATH = join(__dirname, "..", "sent-games.json");
 const MARINERS_VIDEO_URL = "https://www.mlb.com/mariners/video";
@@ -76,7 +76,6 @@ async function fetchGameContent(gamePk) {
 }
 
 function extractHighlightUrl(content, gamePk) {
-  // DEBUG: dump item metadata to identify the game recap video
   const items = content?.highlights?.highlights?.items;
 
   if (!items?.length) {
@@ -84,20 +83,34 @@ function extractHighlightUrl(content, gamePk) {
     return null;
   }
 
-  for (const item of items) {
-    console.log(JSON.stringify({
-      title: item.title || item.headline,
-      type: item.type,
-      slug: item.slug,
-      blurb: item.blurb,
-      duration: item.duration,
-      keywordsType: item.keywordsAll?.map((k) => `${k.type}:${k.value}`).slice(0, 5),
-    }));
+  // The game recap (~3-5 min) is tagged with "taxonomy:game-recap"
+  // or "subject:MLBCOM_GAME_RECAP" in its keywordsAll array.
+  const recap = items.find((item) =>
+    item.keywordsAll?.some((k) =>
+      k.value === "game-recap" || k.value === "MLBCOM_GAME_RECAP"
+    )
+  );
+
+  if (!recap) {
+    console.log(`No game recap item found for game ${gamePk}.`);
+    return null;
   }
 
-  // Placeholder — will be updated once we know how to identify the recap
-  console.log(`Diagnostic run — no video selected for game ${gamePk}.`);
-  return null;
+  console.log(`Selected: "${recap.title || recap.headline}" (${recap.duration})`);
+
+  const playbacks = recap?.playbacks;
+  if (!playbacks?.length) {
+    console.log(`Game recap found but no playbacks for game ${gamePk}.`);
+    return null;
+  }
+
+  const preferred = playbacks.find((p) => /mp4Avc|2500K/i.test(p.name));
+  const url = preferred?.url || playbacks[playbacks.length - 1]?.url;
+
+  if (url) {
+    console.log(`Found highlight URL for game ${gamePk}: ${url}`);
+  }
+  return url || null;
 }
 
 async function loadSentGames() {
