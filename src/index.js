@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TEAM_ID = 136;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;  // TODO: restore to 3 after debugging
 const RETRY_DELAY_MS = 15 * 60 * 1000;
 const SENT_GAMES_PATH = join(__dirname, "..", "sent-games.json");
 const MARINERS_VIDEO_URL = "https://www.mlb.com/mariners/video";
@@ -79,6 +79,23 @@ function extractHighlightUrl(content, gamePk) {
   // The full game highlights video lives in media.epg, not in
   // highlights.highlights.items (which contains individual play clips).
   const epg = content?.media?.epg;
+
+  // Dump the content structure so we can see what the API actually returns
+  console.log(`Content top-level keys: ${JSON.stringify(Object.keys(content || {}))}`);
+  console.log(`Content.media keys: ${JSON.stringify(Object.keys(content?.media || {}))}`);
+  console.log(`Content.highlights keys: ${JSON.stringify(Object.keys(content?.highlights || {}))}`);
+  if (content?.highlights?.highlights?.items?.length) {
+    console.log(
+      `Content.highlights.highlights.items: ` +
+        content.highlights.highlights.items.slice(0, 5).map((i) => `"${i.title || i.headline}"`).join(", ")
+    );
+  }
+  if (content?.media?.epg?.length) {
+    console.log(`Content.media.epg titles: ${content.media.epg.map((e) => `"${e.title}"`).join(", ")}`);
+  }
+  if (content?.media?.epgAlternate?.length) {
+    console.log(`Content.media.epgAlternate titles: ${content.media.epgAlternate.map((e) => `"${e.title}"`).join(", ")}`);
+  }
 
   if (!epg?.length) {
     console.log(`No media.epg found for game ${gamePk}.`);
