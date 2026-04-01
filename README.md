@@ -1,57 +1,71 @@
-# Mariners Highlights Emailer
+# Highlight Reel
 
-A GitHub Actions service that automatically sends a spoiler-free email with a direct link to the Seattle Mariners' daily game highlights video.
+Spoiler-free MLB game recap videos, delivered to your inbox. No scores, no spoilers — just the highlights.
 
-No scores. No opponents. No spoilers. Just a link.
+## Architecture
+
+- **Frontend**: Next.js (App Router) on Vercel
+- **Database & Auth**: Supabase (Postgres + magic link auth)
+- **Email**: Brevo transactional API
+- **Scheduling**: Vercel Cron → `/api/cron` route
 
 ## Setup
 
-### 1. Create a Brevo account
+### 1. Supabase
 
-Sign up at [brevo.com](https://www.brevo.com) and get an API key from **SMTP & API > API Keys**. The free tier (300 emails/day) is more than enough.
+1. Create a project at [supabase.com](https://supabase.com)
+2. Run `supabase-schema.sql` in the SQL editor
+3. Enable email auth (magic links) in Authentication → Providers
+4. Copy the project URL, anon key, and service role key
 
-### 2. Configure GitHub Secrets
+### 2. Environment variables
 
-In your repo, go to **Settings > Secrets and variables > Actions** and add:
+Copy `.env.local.example` to `.env.local` and fill in:
 
-| Secret | Description |
-|---|---|
-| `EMAIL_API_KEY` | Your Brevo API key |
-| `RECIPIENT_EMAIL` | Email address to receive highlights |
-| `FROM_EMAIL` | Verified sender address (e.g. `highlights@yourdomain.com`) |
-
-### 3. Enable the workflow
-
-The workflow runs automatically on a cron schedule during baseball season (late March through October). It checks every 30 minutes from 6 PM to 1 AM Pacific time.
-
-You can also trigger it manually from the **Actions** tab using the "Run workflow" button.
-
-## How it works
-
-1. Checks the MLB Stats API for today's Mariners game
-2. If the game is final, extracts the highlight video URL
-3. Sends a spoiler-free email with the video link
-4. Records the game ID in `sent-games.json` to avoid duplicates
-
-If highlights aren't available yet, it retries up to 3 times (15-minute intervals). If still unavailable, it sends a fallback email linking to the Mariners video page.
-
-## Local testing
-
-```bash
-# Install dependencies
-npm install
-
-# Dry run against a past game date (no email sent)
-DATE_OVERRIDE=2025-06-15 DRY_RUN=true npm start
-
-# Send a real email for a past game
-DATE_OVERRIDE=2025-06-15 \
-  EMAIL_API_KEY=xkeysib-xxxxx \
-  RECIPIENT_EMAIL=you@example.com \
-  FROM_EMAIL=highlights@yourdomain.com \
-  npm start
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+EMAIL_API_KEY=xkeysib-xxxxx
+FROM_EMAIL=highlights@yourdomain.com
+CRON_SECRET=generate-a-random-string
+NEXT_PUBLIC_SITE_URL=https://yourdomain.com
 ```
 
-## Deduplication
+### 3. Run locally
 
-Game IDs are stored in `sent-games.json` and committed to the repo by the workflow. This prevents duplicate emails across cron runs.
+```bash
+npm install
+npm run dev
+```
+
+### 4. Deploy to Vercel
+
+Connect the repo to Vercel. Add the environment variables in the Vercel dashboard. The cron schedule is defined in `vercel.json`.
+
+## Legacy
+
+The original single-user GitHub Actions emailer is preserved in `legacy/`. The GitHub Actions workflow in `.github/workflows/` can continue running independently.
+
+## Project structure
+
+```
+app/
+  page.js                    # Landing page
+  login/page.js              # Magic link auth
+  dashboard/page.js          # Team selection
+  unsubscribe/page.js        # One-click unsubscribe
+  auth/callback/route.js     # OAuth callback
+  api/cron/route.js          # Cron worker (multi-team)
+  api/unsubscribe/route.js   # Unsubscribe API
+  api/auth/signout/route.js  # Sign out
+lib/
+  mlb.js                     # MLB Stats API utilities
+  teams.js                   # 30 MLB teams data
+  supabase-server.js         # Server-side Supabase client
+  supabase-browser.js        # Browser-side Supabase client
+  supabase-admin.js          # Admin client (service role)
+legacy/
+  index.js                   # Original single-user script
+  sent-games.json            # Original dedup log
+```
