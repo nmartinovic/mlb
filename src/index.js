@@ -129,29 +129,14 @@ async function saveSentGames(gameIds) {
 }
 
 function buildEmailHtml(dateStr, entries) {
-  const hasUrls = entries.some((e) => e.url);
   const multiple = entries.length > 1;
-
-  if (!hasUrls) {
-    return [
-      "<p>Today's Mariners highlights aren't available yet.</p>",
-      `<p><a href="${MARINERS_VIDEO_URL}">Check MLB.com for highlights</a></p>`,
-    ].join("\n");
-  }
-
   const lines = ["<p>Today's Mariners highlights are ready.</p>"];
+
   for (let i = 0; i < entries.length; i++) {
-    const { url } = entries[i];
-    if (url) {
-      const label = multiple ? `Watch Game ${i + 1} highlights` : "Watch highlights";
-      lines.push(`<p><a href="${url}">${label}</a></p>`);
-    } else {
-      const label = multiple ? `Game ${i + 1}` : "Highlights";
-      lines.push(
-        `<p>${label} not yet available &mdash; <a href="${MARINERS_VIDEO_URL}">check MLB.com</a></p>`
-      );
-    }
+    const label = multiple ? `Watch Game ${i + 1} highlights` : "Watch highlights";
+    lines.push(`<p><a href="${entries[i].url}">${label}</a></p>`);
   }
+
   return lines.join("\n");
 }
 
@@ -235,17 +220,26 @@ async function main() {
     results.push({ gamePk: game.gamePk, url, dateStr });
   }
 
+  // Only email games where we actually found a highlight URL
+  const ready = results.filter((r) => r.url);
+
+  if (ready.length === 0) {
+    console.log("Highlights not yet available for any games. Will retry next run.");
+    return;
+  }
+
   // Use the game's scheduled date for the email subject
-  const primaryDate = results[0].dateStr;
+  const primaryDate = ready[0].dateStr;
   const subject = `Mariners Highlights \u2014 ${formatDisplayDate(primaryDate)}`;
-  const html = buildEmailHtml(primaryDate, results);
+  const html = buildEmailHtml(primaryDate, ready);
   await sendEmail(subject, html);
 
-  const updatedSentGames = [...sentGames, ...results.map((r) => r.gamePk)];
+  // Only mark games with highlights as sent — games without will be retried
+  const updatedSentGames = [...sentGames, ...ready.map((r) => r.gamePk)];
   await saveSentGames(updatedSentGames);
 
   console.log(
-    `Done. Processed game(s): ${results.map((r) => r.gamePk).join(", ")}`
+    `Done. Processed game(s): ${ready.map((r) => r.gamePk).join(", ")}`
   );
 }
 
