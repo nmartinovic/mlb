@@ -2,10 +2,11 @@ name: Mariners Highlights Emailer
 
 on:
   schedule:
-    # Every 30 min from 02:00-08:30 UTC (covers ~6 PM - 1 AM Pacific)
-    - cron: '0,30 2-8 * * *'
-    # 09:00 UTC catch-all for late West Coast games
-    - cron: '0 9 * * *'
+    # Hourly from 23:00-08:00 UTC (3 PM - 12 AM Pacific), covers all US time zones
+    - cron: '0 23 * * *'
+    - cron: '0 0-8 * * *'
+    # 10:00 UTC (2 AM Pacific) catch-all for extra-inning games
+    - cron: '0 10 * * *'
   workflow_dispatch: {}
 
 concurrency:
