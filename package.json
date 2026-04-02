@@ -1,15 +1,21 @@
 {
-  "name": "mariners-highlights-emailer",
-  "version": "1.0.0",
+  "name": "highlight-reel",
+  "version": "0.1.0",
   "private": true,
-  "description": "Spoiler-free Mariners game highlights emailer",
-  "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dry-run": "DRY_RUN=true node src/index.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "next": "^15.3.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
-  "dependencies": {}
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.4",
+    "tailwindcss": "^4.1.4"
+  }
 }
