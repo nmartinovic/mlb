@@ -13,7 +13,7 @@ export async function POST(request) {
   // The token is the user's ID, signed/encoded in the email link.
   // For MVP, we use the user ID directly. In production, use a signed JWT.
   const { error } = await supabase
-    .from("user_teams")
+    .from("mlb_user_teams")
     .delete()
     .eq("user_id", token);
 

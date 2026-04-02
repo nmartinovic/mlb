@@ -1,7 +1,8 @@
--- Run this in the Supabase SQL editor to set up the database.
+-- Run this in the Supabase SQL editor to set up the MLB highlights tables.
+-- All tables are prefixed with mlb_ to avoid conflicts with other apps sharing this project.
 
 -- User team subscriptions
-create table public.user_teams (
+create table public.mlb_user_teams (
   user_id uuid references auth.users(id) on delete cascade not null,
   team_id integer not null,
   created_at timestamptz default now() not null,
@@ -9,7 +10,7 @@ create table public.user_teams (
 );
 
 -- Game cache (one row per game, shared across all users)
-create table public.game_cache (
+create table public.mlb_game_cache (
   game_pk integer primary key,
   team_id integer not null,
   game_date date not null,
@@ -19,7 +20,7 @@ create table public.game_cache (
 );
 
 -- Sent notification tracking (prevents duplicate emails)
-create table public.sent_notifications (
+create table public.mlb_sent_notifications (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,
   game_pk integer not null,
@@ -28,39 +29,39 @@ create table public.sent_notifications (
 );
 
 -- Indexes for common queries
-create index idx_user_teams_team_id on public.user_teams(team_id);
-create index idx_game_cache_team_date on public.game_cache(team_id, game_date);
-create index idx_sent_notifications_user_game on public.sent_notifications(user_id, game_pk);
+create index idx_mlb_user_teams_team_id on public.mlb_user_teams(team_id);
+create index idx_mlb_game_cache_team_date on public.mlb_game_cache(team_id, game_date);
+create index idx_mlb_sent_notifications_user_game on public.mlb_sent_notifications(user_id, game_pk);
 
 -- Row Level Security
-alter table public.user_teams enable row level security;
-alter table public.game_cache enable row level security;
-alter table public.sent_notifications enable row level security;
+alter table public.mlb_user_teams enable row level security;
+alter table public.mlb_game_cache enable row level security;
+alter table public.mlb_sent_notifications enable row level security;
 
--- user_teams: users can read/write their own rows
-create policy "Users can view their own teams"
-  on public.user_teams for select
+-- mlb_user_teams: users can read/write their own rows
+create policy "Users can view their own MLB teams"
+  on public.mlb_user_teams for select
   using (auth.uid() = user_id);
 
-create policy "Users can insert their own teams"
-  on public.user_teams for insert
+create policy "Users can insert their own MLB teams"
+  on public.mlb_user_teams for insert
   with check (auth.uid() = user_id);
 
-create policy "Users can delete their own teams"
-  on public.user_teams for delete
+create policy "Users can delete their own MLB teams"
+  on public.mlb_user_teams for delete
   using (auth.uid() = user_id);
 
--- game_cache: readable by everyone (public data), writable by service role only
-create policy "Anyone can read game cache"
-  on public.game_cache for select
+-- mlb_game_cache: readable by everyone (public data), writable by service role only
+create policy "Anyone can read MLB game cache"
+  on public.mlb_game_cache for select
   using (true);
 
--- sent_notifications: users can read their own
-create policy "Users can view their own notifications"
-  on public.sent_notifications for select
+-- mlb_sent_notifications: users can read their own
+create policy "Users can view their own MLB notifications"
+  on public.mlb_sent_notifications for select
   using (auth.uid() = user_id);
 
--- Create a view to join user_teams with auth.users for the cron worker
+-- Create a view to join mlb_user_teams with auth.users for the cron worker
 -- (The cron worker uses the service role key which bypasses RLS)
-create view public.users as
+create view public.mlb_users as
   select id, email from auth.users;
