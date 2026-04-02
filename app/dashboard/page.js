@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const { data: userTeams } = await supabase
-    .from("user_teams")
+    .from("mlb_user_teams")
     .select("team_id")
     .eq("user_id", user.id);
 

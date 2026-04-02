@@ -24,12 +24,12 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
 
     if (isFollowing) {
       await supabase
-        .from("user_teams")
+        .from("mlb_user_teams")
         .delete()
         .eq("team_id", teamId);
     } else {
       await supabase
-        .from("user_teams")
+        .from("mlb_user_teams")
         .insert({ team_id: teamId });
     }
 

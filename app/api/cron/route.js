@@ -24,7 +24,7 @@ export async function GET(request) {
 
   // 1. Get all team IDs that at least one user follows
   const { data: subscribedTeams } = await supabase
-    .from("user_teams")
+    .from("mlb_user_teams")
     .select("team_id")
     .limit(1000);
 
@@ -48,7 +48,7 @@ export async function GET(request) {
         for (const game of finals) {
           // Check if we already have this game cached with a highlight URL
           const { data: cached } = await supabase
-            .from("game_cache")
+            .from("mlb_game_cache")
             .select("highlight_url")
             .eq("game_pk", game.gamePk)
             .single();
@@ -69,7 +69,7 @@ export async function GET(request) {
           const url = extractHighlightUrl(content);
 
           // Upsert into game_cache
-          await supabase.from("game_cache").upsert({
+          await supabase.from("mlb_game_cache").upsert({
             game_pk: game.gamePk,
             team_id: teamId,
             game_date: dateStr,
@@ -105,20 +105,20 @@ export async function GET(request) {
   for (const game of newGames) {
     // Get users following this team who haven't been notified for this game
     const { data: users } = await supabase
-      .from("user_teams")
-      .select("user_id, users!inner(email)")
+      .from("mlb_user_teams")
+      .select("user_id, mlb_users!inner(email)")
       .eq("team_id", game.teamId);
 
     if (!users?.length) continue;
 
     for (const row of users) {
       const userId = row.user_id;
-      const email = row.users?.email;
+      const email = row.mlb_users?.email;
       if (!email) continue;
 
       // Check if already notified
       const { data: existing } = await supabase
-        .from("sent_notifications")
+        .from("mlb_sent_notifications")
         .select("id")
         .eq("user_id", userId)
         .eq("game_pk", game.gamePk)
@@ -135,7 +135,7 @@ export async function GET(request) {
       try {
         await sendEmail(email, subject, html);
 
-        await supabase.from("sent_notifications").insert({
+        await supabase.from("mlb_sent_notifications").insert({
           user_id: userId,
           game_pk: game.gamePk,
         });
