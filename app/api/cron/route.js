@@ -129,13 +129,14 @@ export async function GET(request) {
       if (!email) continue;
 
       // Check if already notified
-      const { data: existing } = await supabase
+      const { data: existing, error: notifError } = await supabase
         .from("mlb_sent_notifications")
         .select("id")
         .eq("user_id", userId)
         .eq("game_pk", game.gamePk)
         .single();
 
+      debug.push({ step: "notificationCheck", userId, gamePk: game.gamePk, existing: !!existing, error: notifError });
       if (existing) continue;
 
       // Send email
@@ -153,8 +154,9 @@ export async function GET(request) {
         });
 
         emailsSent++;
+        debug.push({ step: "emailSent", email, gamePk: game.gamePk });
       } catch (err) {
-        console.error(`Failed to email ${email} for game ${game.gamePk}:`, err.message);
+        debug.push({ step: "emailFailed", email, gamePk: game.gamePk, error: err.message });
       }
     }
   }
