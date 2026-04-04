@@ -48,6 +48,7 @@ Connect the repo to Vercel. Add the environment variables in the Vercel dashboar
 The original single-user GitHub Actions emailer is preserved in `legacy/`. The GitHub Actions workflow in `.github/workflows/` can continue running independently.
 
 ## Project structure
+test
 
 ```
 app/
