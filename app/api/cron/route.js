@@ -101,15 +101,16 @@ export async function GET(request) {
 
   // 3. For each game with highlights, find users to notify
   let emailsSent = 0;
+  const debug = [];
 
   for (const game of newGames) {
     // Get users following this team
-    const { data: subscribers } = await supabase
+    const { data: subscribers, error: subError } = await supabase
       .from("mlb_user_teams")
       .select("user_id")
       .eq("team_id", game.teamId);
 
-    console.log(`Game ${game.gamePk}: found ${subscribers?.length || 0} subscribers`);
+    debug.push({ step: "subscribers", teamId: game.teamId, count: subscribers?.length, error: subError });
     if (!subscribers?.length) continue;
 
     for (const row of subscribers) {
@@ -122,7 +123,7 @@ export async function GET(request) {
         .eq("id", userId)
         .single();
 
-      console.log(`User ${userId}: email=${userData?.email}, error=${JSON.stringify(userError)}`);
+      debug.push({ step: "userLookup", userId, email: userData?.email, error: userError });
 
       const email = userData?.email;
       if (!email) continue;
@@ -160,6 +161,7 @@ export async function GET(request) {
 
   return NextResponse.json({
     message: `Processed ${newGames.length} games, sent ${emailsSent} emails`,
+    debug,
   });
 }
 
