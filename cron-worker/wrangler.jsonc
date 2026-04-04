@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "highlight-reel-cron",
+  "main": "index.js",
+  "compatibility_date": "2025-05-05",
+  "triggers": {
+    "crons": ["0 */2 * * *"]
+  }
+}
