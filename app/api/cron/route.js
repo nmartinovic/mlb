@@ -103,17 +103,25 @@ export async function GET(request) {
   let emailsSent = 0;
 
   for (const game of newGames) {
-    // Get users following this team who haven't been notified for this game
-    const { data: users } = await supabase
+    // Get users following this team
+    const { data: subscribers } = await supabase
       .from("mlb_user_teams")
-      .select("user_id, mlb_users!inner(email)")
+      .select("user_id")
       .eq("team_id", game.teamId);
 
-    if (!users?.length) continue;
+    if (!subscribers?.length) continue;
 
-    for (const row of users) {
+    for (const row of subscribers) {
       const userId = row.user_id;
-      const email = row.mlb_users?.email;
+
+      // Look up email from auth.users via the mlb_users view
+      const { data: userData } = await supabase
+        .from("mlb_users")
+        .select("email")
+        .eq("id", userId)
+        .single();
+
+      const email = userData?.email;
       if (!email) continue;
 
       // Check if already notified
