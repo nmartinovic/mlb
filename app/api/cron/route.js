@@ -109,17 +109,20 @@ export async function GET(request) {
       .select("user_id")
       .eq("team_id", game.teamId);
 
+    console.log(`Game ${game.gamePk}: found ${subscribers?.length || 0} subscribers`);
     if (!subscribers?.length) continue;
 
     for (const row of subscribers) {
       const userId = row.user_id;
 
       // Look up email from auth.users via the mlb_users view
-      const { data: userData } = await supabase
+      const { data: userData, error: userError } = await supabase
         .from("mlb_users")
         .select("email")
         .eq("id", userId)
         .single();
+
+      console.log(`User ${userId}: email=${userData?.email}, error=${JSON.stringify(userError)}`);
 
       const email = userData?.email;
       if (!email) continue;
