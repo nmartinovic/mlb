@@ -101,42 +101,35 @@ export async function GET(request) {
 
   // 3. For each game with highlights, find users to notify
   let emailsSent = 0;
-  const debug = [];
 
   for (const game of newGames) {
-    // Get users following this team
-    const { data: subscribers, error: subError } = await supabase
+    const { data: subscribers } = await supabase
       .from("mlb_user_teams")
       .select("user_id")
       .eq("team_id", game.teamId);
 
-    debug.push({ step: "subscribers", teamId: game.teamId, count: subscribers?.length, error: subError });
     if (!subscribers?.length) continue;
 
     for (const row of subscribers) {
       const userId = row.user_id;
 
-      // Look up email from auth.users via the mlb_users view
-      const { data: userData, error: userError } = await supabase
+      const { data: userData } = await supabase
         .from("mlb_users")
         .select("email")
         .eq("id", userId)
         .single();
 
-      debug.push({ step: "userLookup", userId, email: userData?.email, error: userError });
-
       const email = userData?.email;
       if (!email) continue;
 
       // Check if already notified
-      const { data: existing, error: notifError } = await supabase
+      const { data: existing } = await supabase
         .from("mlb_sent_notifications")
         .select("id")
         .eq("user_id", userId)
         .eq("game_pk", game.gamePk)
-        .single();
+        .maybeSingle();
 
-      debug.push({ step: "notificationCheck", userId, gamePk: game.gamePk, existing: !!existing, error: notifError });
       if (existing) continue;
 
       // Send email
@@ -154,21 +147,19 @@ export async function GET(request) {
         });
 
         emailsSent++;
-        debug.push({ step: "emailSent", email, gamePk: game.gamePk });
       } catch (err) {
-        debug.push({ step: "emailFailed", email, gamePk: game.gamePk, error: err.message });
+        console.error(`Failed to email ${email} for game ${game.gamePk}:`, err.message);
       }
     }
   }
 
   return NextResponse.json({
     message: `Processed ${newGames.length} games, sent ${emailsSent} emails`,
-    debug,
   });
 }
 
 function buildEmailHtml(teamName, highlightUrl, userId) {
-  const unsubscribeUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com"}/unsubscribe?token=${userId}`;
+  const unsubscribeUrl = `${process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com"}/unsubscribe?token=${userId}`;
 
   return `
 <p>${teamName} highlights are ready.</p>
