@@ -1,6 +1,14 @@
+import { getRequestHandler } from "@opennextjs/cloudflare";
+
+const handler = await getRequestHandler();
+
 export default {
+  async fetch(request, env, ctx) {
+    return handler(request, env, ctx);
+  },
+
   async scheduled(event, env, ctx) {
-    const url = `${env.APP_URL}/api/cron`;
+    const url = `${env.SITE_URL}/api/cron`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
     });
