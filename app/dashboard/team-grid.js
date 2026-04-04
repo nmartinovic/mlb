@@ -11,6 +11,7 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
 
   async function toggle(teamId) {
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     const isFollowing = followed.has(teamId);
 
     // Optimistic update
@@ -26,11 +27,12 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
       await supabase
         .from("mlb_user_teams")
         .delete()
+        .eq("user_id", user.id)
         .eq("team_id", teamId);
     } else {
       await supabase
         .from("mlb_user_teams")
-        .insert({ team_id: teamId });
+        .insert({ user_id: user.id, team_id: teamId });
     }
 
     startTransition(() => router.refresh());
