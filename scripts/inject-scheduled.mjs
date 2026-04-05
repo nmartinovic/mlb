@@ -11,17 +11,23 @@ if (worker.includes("scheduled")) {
   process.exit(0);
 }
 
+// Call the worker's own fetch handler directly instead of making an external
+// HTTP request, which hits Cloudflare error 1042 (self-referencing route).
 const scheduledHandler = `
     async scheduled(event, env, ctx) {
-        const url = \`\${env.SITE_URL}/api/cron\`;
-        const res = await fetch(url, {
-            headers: { Authorization: \`Bearer \${env.CRON_SECRET}\` },
-        });
-        const body = await res.text();
-        console.log(\`Cron response (\${res.status}): \${body}\`);
+        try {
+            const request = new Request("https://dummy/api/cron", {
+                headers: { Authorization: \`Bearer \${env.CRON_SECRET}\` },
+            });
+            const response = await this.fetch(request, env, ctx);
+            const body = await response.text();
+            console.log(\`Cron response (\${response.status}): \${body}\`);
+        } catch (err) {
+            console.error(\`Cron handler error: \${err.message}\`);
+        }
     },`;
 
-// Insert scheduled() right after the fetch() method's closing brace
+// Insert scheduled() right before the fetch() method
 const patched = worker.replace(
   /async fetch\(request, env, ctx\) \{/,
   `${scheduledHandler}\n    async fetch(request, env, ctx) {`
