@@ -8,6 +8,10 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "vars": {
+    "SITE_URL": "https://mlb.nmartinovic.workers.dev",
+    "FROM_EMAIL": "info@nickmartinovic.com"
+  },
   "triggers": {
     "crons": ["0 * * * *"]
   }
