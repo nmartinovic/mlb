@@ -12,6 +12,12 @@
     "SITE_URL": "https://mlb.nmartinovic.workers.dev",
     "FROM_EMAIL": "info@nickmartinovic.com"
   },
+  "observability": {
+    "logs": {
+      "enabled": false,
+      "invocation_logs": true
+    }
+  },
   "triggers": {
     "crons": ["0 * * * *"]
   }
