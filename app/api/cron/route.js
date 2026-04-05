@@ -34,7 +34,7 @@ export async function GET(request) {
     return NextResponse.json({ message: "No subscribed teams" });
   }
 
-  console.log(`Checking ${teamIds.length} teams across ${dates.length} dates`);
+  console.log(`Checking ${teamIds.length} teams across dates: ${dates.join(", ")}`);
 
   // 2. For each team, fetch schedule and find final games
   const newGames = [];
@@ -86,7 +86,13 @@ export async function GET(request) {
               highlightUrl: url,
             });
           } else {
-            console.log(`No highlight yet for game ${game.gamePk} (team ${teamId})`);
+            const contentKeys = Object.keys(content || {}).join(", ");
+            const hasHighlights = !!content?.highlights?.highlights?.items?.length;
+            const hasEpg = !!content?.media?.epg?.length;
+            console.log(
+              `No highlight for game ${game.gamePk} (team ${teamId}, date ${dateStr}). ` +
+              `Content keys: [${contentKeys}], hasLegacyHighlights: ${hasHighlights}, hasEpg: ${hasEpg}`
+            );
           }
         }
       } catch (err) {
