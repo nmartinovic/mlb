@@ -43,12 +43,7 @@ npm run dev
 
 Connect the repo to Vercel. Add the environment variables in the Vercel dashboard. The cron schedule is defined in `vercel.json`.
 
-## Legacy
-
-The original single-user GitHub Actions emailer is preserved in `legacy/`. The GitHub Actions workflow in `.github/workflows/` can continue running independently.
-
 ## Project structure
-test
 
 ```
 app/
@@ -66,7 +61,4 @@ lib/
   supabase-server.js         # Server-side Supabase client
   supabase-browser.js        # Browser-side Supabase client
   supabase-admin.js          # Admin client (service role)
-legacy/
-  index.js                   # Original single-user script
-  sent-games.json            # Original dedup log
 ```
