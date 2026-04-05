@@ -23,7 +23,4 @@ export default {
       queue: "direct",
     },
   },
-  cloudflare: {
-    customWorkerEntry: "./custom-worker.js",
-  },
 } satisfies OpenNextConfig;
