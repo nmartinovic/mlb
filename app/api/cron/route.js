@@ -107,6 +107,8 @@ export async function GET(request) {
 
   // 3. For each game with highlights, find users to notify
   let emailsSent = 0;
+  const errors = [];
+  const skipped = [];
 
   for (const game of newGames) {
     const { data: subscribers } = await supabase
@@ -114,7 +116,10 @@ export async function GET(request) {
       .select("user_id")
       .eq("team_id", game.teamId);
 
-    if (!subscribers?.length) continue;
+    if (!subscribers?.length) {
+      skipped.push({ gamePk: game.gamePk, reason: "no_subscribers" });
+      continue;
+    }
 
     for (const row of subscribers) {
       const userId = row.user_id;
@@ -126,7 +131,10 @@ export async function GET(request) {
         .single();
 
       const email = userData?.email;
-      if (!email) continue;
+      if (!email) {
+        skipped.push({ gamePk: game.gamePk, userId, reason: "no_email" });
+        continue;
+      }
 
       // Check if already notified
       const { data: existing } = await supabase
@@ -136,7 +144,10 @@ export async function GET(request) {
         .eq("game_pk", game.gamePk)
         .maybeSingle();
 
-      if (existing) continue;
+      if (existing) {
+        skipped.push({ gamePk: game.gamePk, reason: "already_notified" });
+        continue;
+      }
 
       // Send email
       const team = TEAMS_BY_ID[game.teamId];
@@ -154,13 +165,17 @@ export async function GET(request) {
 
         emailsSent++;
       } catch (err) {
-        console.error(`Failed to email ${email} for game ${game.gamePk}:`, err.message);
+        const errMsg = `Failed to email ${email} for game ${game.gamePk}: ${err.message}`;
+        console.error(errMsg);
+        errors.push(errMsg);
       }
     }
   }
 
   return NextResponse.json({
     message: `Processed ${newGames.length} games, sent ${emailsSent} emails`,
+    errors: errors.length > 0 ? errors : undefined,
+    skipped: skipped.length > 0 ? skipped : undefined,
   });
 }
 
