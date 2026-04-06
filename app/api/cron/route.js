@@ -153,7 +153,7 @@ export async function GET(request) {
       const team = TEAMS_BY_ID[game.teamId];
       const teamName = team?.name || `Team ${game.teamId}`;
       const subject = `${teamName} Highlights \u2014 ${formatDisplayDate(game.gameDate)}`;
-      const html = buildEmailHtml(teamName, game.highlightUrl, userId);
+      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate);
 
       try {
         await sendEmail(email, subject, html);
@@ -179,16 +179,104 @@ export async function GET(request) {
   });
 }
 
-function buildEmailHtml(teamName, highlightUrl, userId) {
-  const unsubscribeUrl = `${process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com"}/unsubscribe?token=${userId}`;
+function buildEmailHtml(team, highlightUrl, userId, gameDate) {
+  const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
+  const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
+  const teamName = team?.name || "Your team";
+  const teamColor = team?.color || "#2563eb";
+  const teamAbbr = team?.abbr || "";
+  const displayDate = formatDisplayDate(gameDate);
 
-  return `
-<p>${teamName} highlights are ready.</p>
-<p><a href="${highlightUrl}">Watch highlights</a></p>
-<hr style="margin-top:32px;border:none;border-top:1px solid #333">
-<p style="font-size:12px;color:#888">
-  <a href="${unsubscribeUrl}" style="color:#888">Unsubscribe</a>
-</p>`.trim();
+  // Extract video ID from MLB highlight URL for thumbnail
+  const videoIdMatch = highlightUrl.match(/\/(\d{5,})\//);
+  const thumbnailUrl = videoIdMatch
+    ? `https://img.mlbstatic.com/mlb-images/image/upload/w_600,q_auto,f_auto/mlb/video/thumbnails/${videoIdMatch[1]}.jpg`
+    : null;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${teamName} Highlights</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;">
+<tr><td align="center" style="padding:24px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+
+  <!-- Team color accent bar -->
+  <tr><td style="height:6px;background-color:${teamColor};"></td></tr>
+
+  <!-- Header -->
+  <tr><td style="padding:28px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td>
+          <span style="display:inline-block;background-color:${teamColor};color:#ffffff;font-size:13px;font-weight:700;letter-spacing:0.5px;padding:4px 10px;border-radius:4px;">${teamAbbr}</span>
+        </td>
+        <td align="right" style="color:#71717a;font-size:13px;">${displayDate}</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Title -->
+  <tr><td style="padding:20px 32px 0 32px;">
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#18181b;line-height:1.3;">${teamName} highlights are ready</h1>
+    <p style="margin:8px 0 0 0;font-size:15px;color:#52525b;line-height:1.5;">Your spoiler-free game recap is waiting for you.</p>
+  </td></tr>
+
+  <!-- Thumbnail + play button overlay -->
+  ${thumbnailUrl ? `<tr><td style="padding:24px 32px 0 32px;">
+    <a href="${highlightUrl}" style="display:block;text-decoration:none;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;">
+        <tr><td background="${thumbnailUrl}" bgcolor="#18181b" width="100%" height="256" valign="middle" style="background-size:cover;background-position:center;border-radius:8px;">
+          <!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:456px;height:256px;"><v:fill type="frame" src="${thumbnailUrl}"/><v:textbox inset="0,0,0,0"><![endif]-->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" height="256"><tr><td align="center" valign="middle">
+            <div style="width:56px;height:56px;border-radius:50%;background-color:rgba(0,0,0,0.6);line-height:56px;text-align:center;">
+              <span style="font-size:24px;color:#ffffff;margin-left:3px;">&#9654;</span>
+            </div>
+          </td></tr></table>
+          <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
+        </td></tr>
+      </table>
+    </a>
+  </td></tr>` : ""}
+
+  <!-- CTA Button -->
+  <tr><td style="padding:24px 32px 0 32px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      <tr><td align="center">
+        <a href="${highlightUrl}" style="display:inline-block;background-color:${teamColor};color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px;letter-spacing:0.3px;">Watch Highlights &#9654;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Footer divider -->
+  <tr><td style="padding:32px 32px 0 32px;">
+    <hr style="margin:0;border:none;border-top:1px solid #e4e4e7;">
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:16px 32px 28px 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="font-size:13px;color:#a1a1aa;">
+          <strong style="color:#52525b;">Highlight Reel</strong><br>
+          Spoiler-free MLB recaps
+        </td>
+        <td align="right" style="font-size:12px;">
+          <a href="${unsubscribeUrl}" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe</a>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 async function sendEmail(to, subject, html) {
