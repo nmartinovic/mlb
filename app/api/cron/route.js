@@ -6,6 +6,7 @@ import {
   extractFinalGames,
   fetchGameContent,
   extractHighlightUrl,
+  extractThumbnailUrl,
   getDatesToCheck,
   formatDisplayDate,
 } from "@/lib/mlb";
@@ -54,19 +55,26 @@ export async function GET(request) {
             .single();
 
           if (cached?.highlight_url) {
-            // Already have the highlight — just need to check for unsent notifications
+            // Already have the highlight — fetch content for thumbnail
+            let thumbnail = null;
+            try {
+              const content = await fetchGameContent(game.gamePk);
+              thumbnail = extractThumbnailUrl(content);
+            } catch (_) {}
             newGames.push({
               gamePk: game.gamePk,
               teamId,
               gameDate: dateStr,
               highlightUrl: cached.highlight_url,
+              thumbnailUrl: thumbnail,
             });
             continue;
           }
 
-          // Try to extract highlight URL
+          // Try to extract highlight URL and thumbnail
           const content = await fetchGameContent(game.gamePk);
           const url = extractHighlightUrl(content);
+          const thumbnail = extractThumbnailUrl(content);
 
           // Upsert into game_cache
           await supabase.from("mlb_game_cache").upsert({
@@ -84,6 +92,7 @@ export async function GET(request) {
               teamId,
               gameDate: dateStr,
               highlightUrl: url,
+              thumbnailUrl: thumbnail,
             });
           } else {
             const contentKeys = Object.keys(content || {}).join(", ");
@@ -153,7 +162,7 @@ export async function GET(request) {
       const team = TEAMS_BY_ID[game.teamId];
       const teamName = team?.name || `Team ${game.teamId}`;
       const subject = `${teamName} Highlights \u2014 ${formatDisplayDate(game.gameDate)}`;
-      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate);
+      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate, game.thumbnailUrl);
 
       try {
         await sendEmail(email, subject, html);
@@ -179,19 +188,13 @@ export async function GET(request) {
   });
 }
 
-function buildEmailHtml(team, highlightUrl, userId, gameDate) {
+function buildEmailHtml(team, highlightUrl, userId, gameDate, thumbnailUrl) {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
   const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
   const teamName = team?.name || "Your team";
   const teamColor = team?.color || "#2563eb";
   const teamAbbr = team?.abbr || "";
   const displayDate = formatDisplayDate(gameDate);
-
-  // Extract video ID from MLB highlight URL for thumbnail
-  const videoIdMatch = highlightUrl.match(/\/(\d{5,})\//);
-  const thumbnailUrl = videoIdMatch
-    ? `https://img.mlbstatic.com/mlb-images/image/upload/w_600,q_auto,f_auto/mlb/video/thumbnails/${videoIdMatch[1]}.jpg`
-    : null;
 
   return `<!DOCTYPE html>
 <html lang="en">
