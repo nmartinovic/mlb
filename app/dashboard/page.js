@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { MLB_TEAMS } from "@/lib/teams";
 import TeamGrid from "./team-grid";
@@ -38,6 +39,13 @@ export default async function DashboardPage() {
       </div>
 
       <p className="mt-1 text-xs text-gray-600">Signed in as {user.email}</p>
+
+      <Link
+        href="/dashboard/highlights"
+        className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition"
+      >
+        View recent highlights →
+      </Link>
 
       <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
     </main>
