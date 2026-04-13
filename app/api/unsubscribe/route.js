@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase-admin";
 import { NextResponse } from "next/server";
+import { verifyToken } from "@/lib/unsubscribe-token";
 
 export async function POST(request) {
   const { token } = await request.json();
@@ -8,14 +9,17 @@ export async function POST(request) {
     return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
 
+  const userId = await verifyToken(token);
+  if (!userId) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 400 });
+  }
+
   const supabase = createAdminClient();
 
-  // The token is the user's ID, signed/encoded in the email link.
-  // For MVP, we use the user ID directly. In production, use a signed JWT.
   const { error } = await supabase
     .from("mlb_user_teams")
     .delete()
-    .eq("user_id", token);
+    .eq("user_id", userId);
 
   if (error) {
     return NextResponse.json({ error: "Failed" }, { status: 500 });

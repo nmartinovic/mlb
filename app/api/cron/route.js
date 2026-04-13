@@ -10,6 +10,7 @@ import {
   getDatesToCheck,
   formatDisplayDate,
 } from "@/lib/mlb";
+import { signToken } from "@/lib/unsubscribe-token";
 
 export const maxDuration = 60;
 
@@ -162,10 +163,11 @@ export async function GET(request) {
       const team = TEAMS_BY_ID[game.teamId];
       const teamName = team?.name || `Team ${game.teamId}`;
       const subject = `${teamName} Highlights \u2014 ${formatDisplayDate(game.gameDate)}`;
-      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate, game.thumbnailUrl);
+      const unsubToken = await signToken(userId);
+      const html = buildEmailHtml(team, game.highlightUrl, unsubToken, game.gameDate, game.thumbnailUrl);
 
       try {
-        await sendEmail(email, subject, html);
+        await sendEmailWithRetry(email, subject, html);
 
         await supabase.from("mlb_sent_notifications").insert({
           user_id: userId,
@@ -188,9 +190,9 @@ export async function GET(request) {
   });
 }
 
-function buildEmailHtml(team, highlightUrl, userId, gameDate, thumbnailUrl) {
+function buildEmailHtml(team, highlightUrl, unsubscribeToken, gameDate, thumbnailUrl) {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
-  const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
+  const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
   const teamName = team?.name || "Your team";
   const teamColor = team?.color || "#2563eb";
   const teamAbbr = team?.abbr || "";
@@ -280,6 +282,23 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate, thumbnailUrl) {
 </table>
 </body>
 </html>`;
+}
+
+async function sendEmailWithRetry(to, subject, html, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await sendEmail(to, subject, html);
+      return;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        console.warn(`Email to ${to} failed (attempt ${attempt}/${maxAttempts}): ${err.message}. Retrying...`);
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function sendEmail(to, subject, html) {

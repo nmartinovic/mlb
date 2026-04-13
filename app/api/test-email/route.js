@@ -20,9 +20,10 @@ export async function GET(request) {
   const to = searchParams.get("to");
   const teamId = parseInt(searchParams.get("teamId") || "119"); // Default: Dodgers
 
-  if (!to) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!to || !emailRegex.test(to)) {
     return NextResponse.json(
-      { error: "Missing ?to=email@example.com" },
+      { error: "Missing or invalid ?to=email@example.com" },
       { status: 400 }
     );
   }
