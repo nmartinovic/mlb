@@ -6,7 +6,6 @@ import {
   extractFinalGames,
   fetchGameContent,
   extractHighlightUrl,
-  extractThumbnailUrl,
   getDatesToCheck,
   formatDisplayDate,
 } from "@/lib/mlb";
@@ -55,26 +54,19 @@ export async function GET(request) {
             .single();
 
           if (cached?.highlight_url) {
-            // Already have the highlight — fetch content for thumbnail
-            let thumbnail = null;
-            try {
-              const content = await fetchGameContent(game.gamePk);
-              thumbnail = extractThumbnailUrl(content);
-            } catch (_) {}
+            // Already have the highlight — just need to check for unsent notifications
             newGames.push({
               gamePk: game.gamePk,
               teamId,
               gameDate: dateStr,
               highlightUrl: cached.highlight_url,
-              thumbnailUrl: thumbnail,
             });
             continue;
           }
 
-          // Try to extract highlight URL and thumbnail
+          // Try to extract highlight URL
           const content = await fetchGameContent(game.gamePk);
           const url = extractHighlightUrl(content);
-          const thumbnail = extractThumbnailUrl(content);
 
           // Upsert into game_cache
           await supabase.from("mlb_game_cache").upsert({
@@ -92,7 +84,6 @@ export async function GET(request) {
               teamId,
               gameDate: dateStr,
               highlightUrl: url,
-              thumbnailUrl: thumbnail,
             });
           } else {
             const contentKeys = Object.keys(content || {}).join(", ");
@@ -162,7 +153,7 @@ export async function GET(request) {
       const team = TEAMS_BY_ID[game.teamId];
       const teamName = team?.name || `Team ${game.teamId}`;
       const subject = `${teamName} Highlights \u2014 ${formatDisplayDate(game.gameDate)}`;
-      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate, game.thumbnailUrl);
+      const html = buildEmailHtml(team, game.highlightUrl, userId, game.gameDate);
 
       try {
         await sendEmail(email, subject, html);
@@ -188,7 +179,7 @@ export async function GET(request) {
   });
 }
 
-function buildEmailHtml(team, highlightUrl, userId, gameDate, thumbnailUrl) {
+function buildEmailHtml(team, highlightUrl, userId, gameDate) {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
   const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
   const teamName = team?.name || "Your team";
@@ -228,23 +219,6 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate, thumbnailUrl) {
     <h1 style="margin:0;font-size:22px;font-weight:700;color:#18181b;line-height:1.3;">${teamName} highlights are ready</h1>
     <p style="margin:8px 0 0 0;font-size:15px;color:#52525b;line-height:1.5;">Your spoiler-free game recap is waiting for you.</p>
   </td></tr>
-
-  <!-- Thumbnail + play button overlay -->
-  ${thumbnailUrl ? `<tr><td style="padding:24px 32px 0 32px;">
-    <a href="${highlightUrl}" style="display:block;text-decoration:none;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;">
-        <tr><td background="${thumbnailUrl}" bgcolor="#18181b" width="100%" height="256" valign="middle" style="background-size:cover;background-position:center;border-radius:8px;">
-          <!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:456px;height:256px;"><v:fill type="frame" src="${thumbnailUrl}"/><v:textbox inset="0,0,0,0"><![endif]-->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" height="256"><tr><td align="center" valign="middle">
-            <div style="width:56px;height:56px;border-radius:50%;background-color:rgba(0,0,0,0.6);line-height:56px;text-align:center;">
-              <span style="font-size:24px;color:#ffffff;margin-left:3px;">&#9654;</span>
-            </div>
-          </td></tr></table>
-          <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
-        </td></tr>
-      </table>
-    </a>
-  </td></tr>` : ""}
 
   <!-- CTA Button -->
   <tr><td style="padding:24px 32px 0 32px;">
