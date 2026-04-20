@@ -22,6 +22,12 @@
       "head_sampling_rate": 1
     }
   },
+  "routes": [
+    {
+      "pattern": "ninthinning.email",
+      "custom_domain": true
+    }
+  ],
   "triggers": {
     "crons": ["0 * * * *"]
   }
