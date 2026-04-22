@@ -219,6 +219,9 @@ Ordered by what to do next.
    defer issue #23 (team logos) for the same reason.
 2. **Stay in free / tip-jar mode** while monetization questions are open.
    Add clear non-affiliation language and attribution to the email template.
+   ✓ *Done (issue #51): non-affiliation disclaimer and "Video: MLB.com" attribution added to
+   every email and the landing page. Buy Me a Coffee tip jar link added (set `BMC_URL` env var
+   after creating the account).*
 3. **Consult an IP / sports-media attorney before any paid launch.**
    ~$500–$1,500 of scoped consultation is cheap relative to the cost of a
    pivot after paying customers exist. Specific questions to bring:
@@ -229,6 +232,9 @@ Ordered by what to do next.
    - What is the right way to frame a tip-jar model to minimize risk?
 4. **Have a takedown response plan.** A single email inbox monitored daily,
    and a one-click "pause all sends" switch, beat any legal argument.
+   ✓ *Done (issue #51): kill switch implemented via `EMAILS_PAUSED` env var (set to `"true"` in
+   Cloudflare dashboard for instant pause, no redeploy). Abuse inbox: `abuse@ninthinning.email`.
+   See [`INCIDENT.md`](./INCIDENT.md) for the full response plan and SLA.*
 5. **Re-evaluate this document annually,** or whenever MLB updates its ToU
    or Sportradar partnership terms.
 

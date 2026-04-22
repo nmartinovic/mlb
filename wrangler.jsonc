@@ -13,7 +13,8 @@
   },
   "vars": {
     "SITE_URL": "https://ninthinning.email",
-    "FROM_EMAIL": "highlights@ninthinning.email"
+    "FROM_EMAIL": "highlights@ninthinning.email",
+    "BMC_URL": "https://buymeacoffee.com/YOUR_USERNAME"
   },
   "observability": {
     "logs": {

@@ -19,6 +19,11 @@ export async function GET(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Kill switch: set EMAILS_PAUSED=true in Cloudflare dashboard to halt all sends instantly
+  if (process.env.EMAILS_PAUSED === "true") {
+    return NextResponse.json({ message: "Emails paused via kill switch" });
+  }
+
   const supabase = createAdminClient();
   const dates = getDatesToCheck();
 
@@ -182,6 +187,7 @@ export async function GET(request) {
 function buildEmailHtml(team, highlightUrl, userId, gameDate) {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
   const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
+  const bmcUrl = process.env.BMC_URL;
   const teamName = team?.name || "Your team";
   const teamColor = team?.color || "#2563eb";
   const teamAbbr = team?.abbr || "";
@@ -226,6 +232,9 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate) {
       <tr><td align="center">
         <a href="${highlightUrl}" style="display:inline-block;background-color:${teamColor};color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px;letter-spacing:0.3px;">Watch Highlights &#9654;</a>
       </td></tr>
+      <tr><td align="center" style="padding-top:8px;font-size:12px;color:#a1a1aa;">
+        Video: <a href="https://www.mlb.com" style="color:#a1a1aa;">MLB.com</a>
+      </td></tr>
     </table>
   </td></tr>
 
@@ -235,18 +244,24 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate) {
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="padding:16px 32px 28px 32px;">
+  <tr><td style="padding:16px 32px 0 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="font-size:13px;color:#a1a1aa;">
           <strong style="color:#52525b;">Highlight Reel</strong><br>
           Spoiler-free MLB recaps
         </td>
-        <td align="right" style="font-size:12px;">
+        <td align="right" style="font-size:12px;vertical-align:top;">
+          ${bmcUrl ? `<a href="${bmcUrl}" style="color:#a1a1aa;text-decoration:underline;">Support this project</a><br>` : ""}
           <a href="${unsubscribeUrl}" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe</a>
         </td>
       </tr>
     </table>
+  </td></tr>
+
+  <!-- Disclaimer -->
+  <tr><td style="padding:12px 32px 28px 32px;">
+    <p style="margin:0;font-size:11px;color:#a1a1aa;line-height:1.5;">Highlight Reel is not affiliated with, endorsed by, or sponsored by MLB or any MLB club. Questions or takedown requests: <a href="mailto:abuse@ninthinning.email" style="color:#a1a1aa;">abuse@ninthinning.email</a></p>
   </td></tr>
 
 </table>
