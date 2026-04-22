@@ -29,9 +29,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 EMAIL_API_KEY=xkeysib-xxxxx
-FROM_EMAIL=highlights@yourdomain.com
+FROM_EMAIL=highlights@ninthinning.email
 CRON_SECRET=generate-a-random-string
-NEXT_PUBLIC_SITE_URL=https://yourdomain.com
+NEXT_PUBLIC_SITE_URL=https://ninthinning.email
 ```
 
 For Cloudflare deployment, set secrets via Wrangler:

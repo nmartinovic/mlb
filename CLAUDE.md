@@ -35,6 +35,14 @@ npm run deploy     # Deploy to Cloudflare
   - `supabase-*.js` — Supabase client helpers (server, browser, admin)
 - `supabase-schema.sql` — Database schema
 
+## Production
+
+- **URL**: https://ninthinning.email
+- **Cloudflare Worker**: `mlb` (custom domain declared in `wrangler.jsonc` under `routes`)
+- **Email sender**: `highlights@ninthinning.email` (Brevo, domain authenticated)
+- **Supabase auth redirect**: `https://ninthinning.email/auth/callback`
+- `SITE_URL` and `FROM_EMAIL` are set as vars in `wrangler.jsonc`; secrets (Supabase keys, `EMAIL_API_KEY`, `CRON_SECRET`) are stored as Cloudflare Worker secrets via Wrangler
+
 ## Key Patterns
 
 - Server-side Supabase client uses `supabase-server.js`; admin operations use `supabase-admin.js` (service role key)
