@@ -12,8 +12,8 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "SITE_URL": "https://mlb.nmartinovic.workers.dev",
-    "FROM_EMAIL": "info@nickmartinovic.com"
+    "SITE_URL": "https://ninthinning.email",
+    "FROM_EMAIL": "highlights@ninthinning.email"
   },
   "observability": {
     "logs": {
@@ -22,6 +22,12 @@
       "head_sampling_rate": 1
     }
   },
+  "routes": [
+    {
+      "pattern": "ninthinning.email",
+      "custom_domain": true
+    }
+  ],
   "triggers": {
     "crons": ["0 * * * *"]
   }
