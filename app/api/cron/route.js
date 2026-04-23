@@ -187,7 +187,7 @@ export async function GET(request) {
 function buildEmailHtml(team, highlightUrl, userId, gameDate) {
   const siteUrl = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
   const unsubscribeUrl = `${siteUrl}/unsubscribe?token=${userId}`;
-  const bmcUrl = process.env.BMC_URL;
+  const tipUrl = process.env.TIP_URL;
   const teamName = team?.name || "Your team";
   const teamColor = team?.color || "#2563eb";
   const teamAbbr = team?.abbr || "";
@@ -252,7 +252,7 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate) {
           Spoiler-free MLB recaps
         </td>
         <td align="right" style="font-size:12px;vertical-align:top;">
-          ${bmcUrl ? `<a href="${bmcUrl}" style="color:#a1a1aa;text-decoration:underline;">Support this project</a><br>` : ""}
+          ${tipUrl ? `<a href="${tipUrl}" style="color:#a1a1aa;text-decoration:underline;">Support this project</a><br>` : ""}
           <a href="${unsubscribeUrl}" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe</a>
         </td>
       </tr>

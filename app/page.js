@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export default function Home() {
-  const bmcUrl = process.env.BMC_URL;
+  const tipUrl = process.env.TIP_URL;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6">
@@ -31,10 +31,10 @@ export default function Home() {
           </Link>
         </div>
 
-        {bmcUrl && (
+        {tipUrl && (
           <p className="mt-4 text-sm text-gray-500">
             <a
-              href={bmcUrl}
+              href={tipUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-400 underline hover:text-gray-300 transition"

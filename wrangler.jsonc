@@ -14,7 +14,7 @@
   "vars": {
     "SITE_URL": "https://ninthinning.email",
     "FROM_EMAIL": "highlights@ninthinning.email",
-    "BMC_URL": "https://buymeacoffee.com/YOUR_USERNAME"
+    "TIP_URL": "https://buy.stripe.com/YOUR_PAYMENT_LINK"
   },
   "observability": {
     "logs": {
