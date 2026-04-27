@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Highlight Reel are documented here.
+All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 

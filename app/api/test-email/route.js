@@ -113,7 +113,7 @@ function buildTestEmailHtml(team, highlightUrl, userId, gameDate) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="font-size:13px;color:#a1a1aa;">
-          <strong style="color:#52525b;">Highlight Reel</strong><br>
+          <strong style="color:#52525b;">Ninth Inning Email</strong><br>
           Spoiler-free MLB recaps
         </td>
         <td align="right" style="font-size:12px;">

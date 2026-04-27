@@ -243,16 +243,24 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate) {
     <hr style="margin:0;border:none;border-top:1px solid #e4e4e7;">
   </td></tr>
 
+  ${tipUrl ? `
+  <!-- Tip prompt -->
+  <tr><td align="center" style="padding:18px 32px 0 32px;">
+    <p style="margin:0;font-size:13px;color:#52525b;line-height:1.5;">
+      Enjoying Ninth Inning Email? <a href="${tipUrl}" style="color:${teamColor};text-decoration:underline;font-weight:600;">Tip the developer</a> to keep it running.
+    </p>
+  </td></tr>
+  ` : ""}
+
   <!-- Footer -->
   <tr><td style="padding:16px 32px 0 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="font-size:13px;color:#a1a1aa;">
-          <strong style="color:#52525b;">Highlight Reel</strong><br>
+          <strong style="color:#52525b;">Ninth Inning Email</strong><br>
           Spoiler-free MLB recaps
         </td>
         <td align="right" style="font-size:12px;vertical-align:top;">
-          ${tipUrl ? `<a href="${tipUrl}" style="color:#a1a1aa;text-decoration:underline;">Support this project</a><br>` : ""}
           <a href="${unsubscribeUrl}" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe</a>
         </td>
       </tr>
@@ -261,7 +269,7 @@ function buildEmailHtml(team, highlightUrl, userId, gameDate) {
 
   <!-- Disclaimer -->
   <tr><td style="padding:12px 32px 28px 32px;">
-    <p style="margin:0;font-size:11px;color:#a1a1aa;line-height:1.5;">Highlight Reel is not affiliated with, endorsed by, or sponsored by MLB or any MLB club. Questions or takedown requests: <a href="mailto:abuse@ninthinning.email" style="color:#a1a1aa;">abuse@ninthinning.email</a></p>
+    <p style="margin:0;font-size:11px;color:#a1a1aa;line-height:1.5;">Ninth Inning Email is not affiliated with, endorsed by, or sponsored by MLB or any MLB club. Questions or takedown requests: <a href="mailto:abuse@ninthinning.email" style="color:#a1a1aa;">abuse@ninthinning.email</a></p>
   </td></tr>
 
 </table>

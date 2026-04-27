@@ -1,4 +1,4 @@
-# Highlight Reel
+# Ninth Inning Email
 
 Spoiler-free MLB game recap videos, delivered to your inbox. No scores, no spoilers — just the highlights.
 
