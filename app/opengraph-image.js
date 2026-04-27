@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Highlight Reel — Spoiler-free MLB recaps in your inbox";
+export const alt =
+  "Ninth Inning Email — Spoiler-free MLB recaps in your inbox";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -17,8 +18,8 @@ export default async function OpengraphImage() {
           alignItems: "flex-start",
           padding: "80px",
           background:
-            "radial-gradient(ellipse 80% 60% at 30% 0%, #1e3a8a 0%, #030712 60%)",
-          color: "#f3f4f6",
+            "radial-gradient(ellipse 80% 60% at 30% 0%, #0f5132 0%, #0a1410 60%)",
+          color: "#f5f1e6",
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
       >
@@ -29,7 +30,7 @@ export default async function OpengraphImage() {
             gap: "16px",
             fontSize: "28px",
             fontWeight: 600,
-            color: "#9ca3af",
+            color: "#a8a299",
             letterSpacing: "0.02em",
           }}
         >
@@ -39,7 +40,7 @@ export default async function OpengraphImage() {
                 width: 18,
                 height: 18,
                 borderRadius: 999,
-                background: "#005A9C",
+                background: "#c41e3a",
               }}
             />
             <div
@@ -47,7 +48,7 @@ export default async function OpengraphImage() {
                 width: 18,
                 height: 18,
                 borderRadius: 999,
-                background: "#E81828",
+                background: "#f5f1e6",
               }}
             />
             <div
@@ -55,11 +56,11 @@ export default async function OpengraphImage() {
                 width: 18,
                 height: 18,
                 borderRadius: 999,
-                background: "#FFC52F",
+                background: "#c41e3a",
               }}
             />
           </div>
-          <span>Highlight Reel</span>
+          <span>Ninth Inning Email</span>
         </div>
         <div
           style={{
@@ -68,7 +69,7 @@ export default async function OpengraphImage() {
             fontWeight: 800,
             lineHeight: 1.05,
             letterSpacing: "-0.03em",
-            color: "#f9fafb",
+            color: "#f5f1e6",
             maxWidth: "1000px",
           }}
         >
@@ -78,7 +79,7 @@ export default async function OpengraphImage() {
           style={{
             marginTop: "32px",
             fontSize: "32px",
-            color: "#9ca3af",
+            color: "#a8a299",
             maxWidth: "900px",
           }}
         >

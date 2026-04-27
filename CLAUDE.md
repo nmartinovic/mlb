@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Highlight Reel — spoiler-free MLB game recap videos delivered via email. Next.js app deployed on Cloudflare via OpenNext.
+Ninth Inning Email — spoiler-free MLB game recap videos delivered via email. Next.js app deployed on Cloudflare via OpenNext.
 
 ## Tech Stack
 
