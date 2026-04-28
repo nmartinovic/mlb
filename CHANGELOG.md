@@ -4,6 +4,17 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+## [2026-04-28]
+
+### Added
+- Vitest test harness with `npm test` and `npm run test:watch` scripts (PR #63, closes #61)
+- 34 unit tests covering the highest-risk modules: `lib/mlb.js` (schedule/content fetch, highlight extraction across legacy + EPG fallbacks, date helpers), `lib/teams.js` (shape and uniqueness of all 30 teams), `lib/email-template.js` (team rendering, `SITE_URL`/`NEXT_PUBLIC_SITE_URL` fall-through, `TIP_URL` toggle), and `app/api/unsubscribe/route.js` (token validation + supabase error path)
+- SessionStart hook (`.claude/hooks/session-start.sh`) that runs `npm install && npm test` on remote Claude Code sessions so each one starts on a green baseline
+- GitHub Actions workflow (`.github/workflows/test.yml`) running `npm ci && npm test` on every push to `main` and every PR
+
+### Changed
+- Extracted `buildEmailHtml` from `app/api/cron/route.js` into `lib/email-template.js` so it can be tested without mocking Supabase or Brevo
+
 ## [2026-04-27]
 
 ### Added
