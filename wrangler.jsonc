@@ -13,7 +13,8 @@
   },
   "vars": {
     "SITE_URL": "https://ninthinning.email",
-    "FROM_EMAIL": "highlights@ninthinning.email"
+    "FROM_EMAIL": "highlights@ninthinning.email",
+    "TIP_URL": "https://buy.stripe.com/28E3cv4w0aDs2yVg16dZ600"
   },
   "observability": {
     "logs": {
