@@ -14,6 +14,13 @@ All notable changes to Ninth Inning Email are documented here.
 
 ### Changed
 - Extracted `buildEmailHtml` from `app/api/cron/route.js` into `lib/email-template.js` so it can be tested without mocking Supabase or Brevo
+- Restored `TIP_URL` to `wrangler.jsonc` as a plain `vars` entry; managing it as an out-of-band Cloudflare Worker secret left it undefined in production after deploys, reverting the approach taken in PR #57 (PR #66)
+
+### Fixed
+- "Tip the developer" row missing from cron recap emails and the landing page FAQ; `process.env.TIP_URL` was undefined in the deployed worker, so the conditional in `lib/email-template.js` and `app/page.js` silently dropped the block (PR #66, closes #65)
+
+### Added
+- `wrangler.test.js` regression test asserting `TIP_URL` is defined in `wrangler.jsonc` so CI catches a re-removal (PR #66)
 
 ## [2026-04-27]
 
