@@ -4,6 +4,9 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+### Changed
+- Brevo `sender` now includes a friendly display name ("Ninth Inning Email") in `app/api/cron/route.js` and `app/api/test-email/route.js`, so inboxes show the brand instead of the raw `highlights@ninthinning.email` address (closes #19)
+
 ## [2026-04-28]
 
 ### Added
