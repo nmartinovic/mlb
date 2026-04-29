@@ -35,7 +35,7 @@ export async function GET(request) {
       Accept: "application/json",
     },
     body: JSON.stringify({
-      sender: { email: process.env.FROM_EMAIL },
+      sender: { email: process.env.FROM_EMAIL, name: "Ninth Inning Email" },
       to: [{ email: to }],
       subject,
       htmlContent: html,
