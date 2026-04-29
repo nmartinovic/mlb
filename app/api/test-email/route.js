@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { TEAMS_BY_ID } from "@/lib/teams";
 import { formatDisplayDate } from "@/lib/mlb";
+import { sendEmail } from "@/lib/brevo";
 
 export async function GET(request) {
   // Only allow with cron secret to prevent abuse
@@ -27,27 +28,10 @@ export async function GET(request) {
   const subject = `[TEST] ${teamName} Highlights — ${formatDisplayDate(gameDate)}`;
   const html = buildTestEmailHtml(team, sampleHighlightUrl, "test-user-id", gameDate);
 
-  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": process.env.EMAIL_API_KEY,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      sender: { email: process.env.FROM_EMAIL, name: "Ninth Inning Email" },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    return NextResponse.json(
-      { error: `Brevo ${res.status}: ${body.slice(0, 300)}` },
-      { status: 500 }
-    );
+  try {
+    await sendEmail(to, subject, html);
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 
   return NextResponse.json({ message: `Test email sent to ${to}`, team: teamName });

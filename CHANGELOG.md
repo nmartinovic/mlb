@@ -6,6 +6,10 @@ All notable changes to Ninth Inning Email are documented here.
 
 ### Changed
 - Brevo `sender` now includes a friendly display name ("Ninth Inning Email") in `app/api/cron/route.js` and `app/api/test-email/route.js`, so inboxes show the brand instead of the raw `highlights@ninthinning.email` address (closes #19)
+- Extracted the Brevo transactional call into `lib/brevo.js` (`sendEmail` + `SENDER_NAME`); cron and test-email routes now share one implementation, and the helper accepts an injectable `fetchImpl` so it can be unit-tested without hitting Brevo
+
+### Added
+- `lib/brevo.test.js` covering request shape (endpoint, headers, body), `sender.name`, `sender.email`, recipient/subject/html forwarding, and the non-2xx error path — locks in the sender display name as a regression test
 
 ## [2026-04-28]
 

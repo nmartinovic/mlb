@@ -10,6 +10,7 @@ import {
   formatDisplayDate,
 } from "@/lib/mlb";
 import { buildEmailHtml } from "@/lib/email-template";
+import { sendEmail } from "@/lib/brevo";
 
 export const maxDuration = 60;
 
@@ -183,26 +184,4 @@ export async function GET(request) {
     errors: errors.length > 0 ? errors : undefined,
     skipped: skipped.length > 0 ? skipped : undefined,
   });
-}
-
-async function sendEmail(to, subject, html) {
-  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": process.env.EMAIL_API_KEY,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      sender: { email: process.env.FROM_EMAIL, name: "Ninth Inning Email" },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Brevo ${res.status}: ${body.slice(0, 200)}`);
-  }
 }
