@@ -39,7 +39,7 @@ npm run deploy     # Deploy to Cloudflare
 
 - **URL**: https://ninthinning.email
 - **Cloudflare Worker**: `mlb` (custom domain declared in `wrangler.jsonc` under `routes`)
-- **Email sender**: `highlights@ninthinning.email` (Brevo, domain authenticated)
+- **Email sender**: `Ninth Inning Email <highlights@ninthinning.email>` (Brevo, domain authenticated; display name set in `app/api/cron/route.js` and `app/api/test-email/route.js`)
 - **Supabase auth redirect**: `https://ninthinning.email/auth/callback`
 - `SITE_URL` and `FROM_EMAIL` are set as vars in `wrangler.jsonc`; secrets (Supabase keys, `EMAIL_API_KEY`, `CRON_SECRET`) are stored as Cloudflare Worker secrets via Wrangler
 
