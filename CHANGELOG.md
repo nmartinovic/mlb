@@ -5,6 +5,7 @@ All notable changes to Ninth Inning Email are documented here.
 ## [Unreleased]
 
 ### Security
+- Fixed email-enumeration leak via the `public.mlb_users` view: Postgres views run with the owner's privileges by default, so RLS on `auth.users` did not apply when `anon`/`authenticated` read the view, and any visitor with the (browser-shipped) anon key could list every signed-up user's id and email. Patched in production by `revoke all on public.mlb_users from anon, authenticated, public;`, and now baked into `supabase-schema.sql` so any new project bootstrapped from it isn't vulnerable. Service-role access (which the cron worker uses) is unaffected. Surfaced during the #56 audit
 - One-time secrets-exposure audit: gitleaks across all 62 commits and manual greps for `SUPABASE_SERVICE_ROLE`, `EMAIL_API_KEY`, `xkeysib-`, `CRON_SECRET`, and Stripe key prefixes confirmed no secrets have ever been committed; `wrangler.jsonc` `vars` only contain non-sensitive values (`SITE_URL`, `FROM_EMAIL`, `TIP_URL`); `supabase-admin.js` is only imported from server-side API routes; client components reference only `NEXT_PUBLIC_*` env vars; RLS is enabled on every `mlb_*` table (closes #56)
 
 ### Added
