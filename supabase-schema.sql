@@ -65,3 +65,11 @@ create policy "Users can view their own MLB notifications"
 -- (The cron worker uses the service role key which bypasses RLS)
 create view public.mlb_users as
   select id, email from auth.users;
+
+-- Lock the view down to service_role only. Postgres views run with the
+-- owner's privileges by default, so RLS on auth.users does NOT apply when
+-- anon/authenticated read this view. Without this revoke, any visitor with
+-- the anon key (which ships in the browser bundle) can list every signed-up
+-- user's email. The cron worker uses service_role, which bypasses grants,
+-- so it keeps working.
+revoke all on public.mlb_users from anon, authenticated, public;
