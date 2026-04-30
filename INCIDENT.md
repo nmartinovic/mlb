@@ -40,4 +40,4 @@ MLB DMCA agent contact: https://www.mlb.com/official-information/terms-of-use
 
 ## Incident log
 
-_No incidents recorded._
+- 2026-04-30 — Routine `CRON_SECRET` rotation dry-run (per #56 acceptance criteria). No incident.
