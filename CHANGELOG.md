@@ -4,16 +4,19 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+## [2026-04-30]
+
 ### Security
-- Fixed email-enumeration leak via the `public.mlb_users` view: Postgres views run with the owner's privileges by default, so RLS on `auth.users` did not apply when `anon`/`authenticated` read the view, and any visitor with the (browser-shipped) anon key could list every signed-up user's id and email. Patched in production by `revoke all on public.mlb_users from anon, authenticated, public;`, and now baked into `supabase-schema.sql` so any new project bootstrapped from it isn't vulnerable. Service-role access (which the cron worker uses) is unaffected. Surfaced during the #56 audit
-- One-time secrets-exposure audit: gitleaks across all 62 commits and manual greps for `SUPABASE_SERVICE_ROLE`, `EMAIL_API_KEY`, `xkeysib-`, `CRON_SECRET`, and Stripe key prefixes confirmed no secrets have ever been committed; `wrangler.jsonc` `vars` only contain non-sensitive values (`SITE_URL`, `FROM_EMAIL`, `TIP_URL`); `supabase-admin.js` is only imported from server-side API routes; client components reference only `NEXT_PUBLIC_*` env vars; RLS is enabled on every `mlb_*` table (closes #56)
+- Fixed email-enumeration leak via the `public.mlb_users` view: Postgres views run with the owner's privileges by default, so RLS on `auth.users` did not apply when `anon`/`authenticated` read the view, and any visitor with the (browser-shipped) anon key could list every signed-up user's id and email. Patched in production by `revoke all on public.mlb_users from anon, authenticated, public;`, and now baked into `supabase-schema.sql` so any new project bootstrapped from it isn't vulnerable. Service-role access (which the cron worker uses) is unaffected. Surfaced during the #56 audit (PR #80)
+- One-time secrets-exposure audit: gitleaks across all 62 commits and manual greps for `SUPABASE_SERVICE_ROLE`, `EMAIL_API_KEY`, `xkeysib-`, `CRON_SECRET`, and Stripe key prefixes confirmed no secrets have ever been committed; `wrangler.jsonc` `vars` only contain non-sensitive values (`SITE_URL`, `FROM_EMAIL`, `TIP_URL`); `supabase-admin.js` is only imported from server-side API routes; client components reference only `NEXT_PUBLIC_*` env vars; RLS is enabled on every `mlb_*` table (PR #79, closes #56)
 
 ### Added
-- `secret-scan` job in `.github/workflows/test.yml` running gitleaks on every PR and push to `main`, with `fetch-depth: 0` so the full history is scanned (closes #56)
-- "Configuration: vars vs. secrets" section in `CLAUDE.md` with the canonical secret list and per-secret rotation runbook targeting a 30-minute end-to-end rotation (closes #56)
+- `secret-scan` job in `.github/workflows/test.yml` running gitleaks on every PR and push to `main`, with `fetch-depth: 0` so the full history is scanned (PR #79, closes #56)
+- "Configuration: vars vs. secrets" section in `CLAUDE.md` with the canonical secret list and per-secret rotation runbook targeting a 30-minute end-to-end rotation; rotation dry-run completed against `CRON_SECRET` and recorded in `INCIDENT.md` (PR #79, closes #56)
+- "Supabase schema conventions" note in `CLAUDE.md` capturing the `mlb_users`-view lesson: any view selecting from `auth.users` must explicitly revoke from `anon`/`authenticated`, since views inherit the owner's privileges and bypass RLS
 
 ### Changed
-- Tightened `.gitignore` to block `.env`, `.env.*`, `.dev.vars*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, while keeping `.env.local.example` tracked (closes #56)
+- Tightened `.gitignore` to block `.env`, `.env.*`, `.dev.vars*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, while keeping `.env.local.example` tracked (PR #79, closes #56)
 - Brevo `sender` now includes a friendly display name ("Ninth Inning Email") in `app/api/cron/route.js` and `app/api/test-email/route.js`, so inboxes show the brand instead of the raw `highlights@ninthinning.email` address (closes #19)
 - Extracted the Brevo transactional call into `lib/brevo.js` (`sendEmail` + `SENDER_NAME`); cron and test-email routes now share one implementation, and the helper accepts an injectable `fetchImpl` so it can be unit-tested without hitting Brevo
 

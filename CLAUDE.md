@@ -103,3 +103,12 @@ If you suspect a leak rather than a routine rotation, also: review `wrangler tai
 - Server-side Supabase client uses `supabase-server.js`; admin operations use `supabase-admin.js` (service role key)
 - Auth flow uses Supabase magic links with callback at `app/auth/callback/route.js`
 - Middleware in `middleware.js` handles session refresh
+
+## Supabase schema conventions
+
+- Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
+- **Views need explicit grants.** Postgres views run with the owner's privileges, so RLS on the underlying table does **not** apply to the caller. Supabase's defaults grant `SELECT` to `anon` and `authenticated` on any new table or view in `public`. For any view that exposes data from `auth.users` (or any sensitive source), you must explicitly:
+  ```sql
+  revoke all on public.<view_name> from anon, authenticated, public;
+  ```
+  See `public.mlb_users` in `supabase-schema.sql` for the canonical example. Skipping this revoke caused an email-enumeration leak that was patched in PR #80.
