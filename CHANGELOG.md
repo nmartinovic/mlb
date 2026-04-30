@@ -4,7 +4,15 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+### Security
+- One-time secrets-exposure audit: gitleaks across all 62 commits and manual greps for `SUPABASE_SERVICE_ROLE`, `EMAIL_API_KEY`, `xkeysib-`, `CRON_SECRET`, and Stripe key prefixes confirmed no secrets have ever been committed; `wrangler.jsonc` `vars` only contain non-sensitive values (`SITE_URL`, `FROM_EMAIL`, `TIP_URL`); `supabase-admin.js` is only imported from server-side API routes; client components reference only `NEXT_PUBLIC_*` env vars; RLS is enabled on every `mlb_*` table (closes #56)
+
+### Added
+- `secret-scan` job in `.github/workflows/test.yml` running gitleaks on every PR and push to `main`, with `fetch-depth: 0` so the full history is scanned (closes #56)
+- "Configuration: vars vs. secrets" section in `CLAUDE.md` with the canonical secret list and per-secret rotation runbook targeting a 30-minute end-to-end rotation (closes #56)
+
 ### Changed
+- Tightened `.gitignore` to block `.env`, `.env.*`, `.dev.vars*`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, while keeping `.env.local.example` tracked (closes #56)
 - Brevo `sender` now includes a friendly display name ("Ninth Inning Email") in `app/api/cron/route.js` and `app/api/test-email/route.js`, so inboxes show the brand instead of the raw `highlights@ninthinning.email` address (closes #19)
 - Extracted the Brevo transactional call into `lib/brevo.js` (`sendEmail` + `SENDER_NAME`); cron and test-email routes now share one implementation, and the helper accepts an injectable `fetchImpl` so it can be unit-tested without hitting Brevo
 
