@@ -126,11 +126,13 @@ Either bucket's rejection returns HTTP 429 before the request reaches Supabase. 
 | Bucket | Limit | Scope |
 |--------|-------|-------|
 | Sign-ups and sign-ins (`signInWithOtp`) | 30 requests / 5 min | per IP |
-| Sending emails (built-in SMTP) | 2 emails / hour | **project-wide** |
+| Sending emails (custom SMTP via Brevo) | 30 emails / hour | **project-wide** |
+
+Custom SMTP via Brevo was wired up in #97 to lift the previous built-in-SMTP cap of 2 emails/hour project-wide (which let two throwaway sign-ins per hour DoS the whole project). Magic links now ship from `highlights@ninthinning.email` via `smtp-relay.brevo.com:587`, configured in the Supabase dashboard under Project Settings → Auth → SMTP Settings. The SMTP credential is a Brevo SMTP key (separate from the transactional `EMAIL_API_KEY` the cron uses) and lives only in the Supabase dashboard — it is **not** a Cloudflare Worker secret.
 
 Implications and known gaps:
 
-- The 2 emails/hour Supabase cap is **project-wide** — abuse-flood against third parties is inherently bounded, but so are legitimate sign-ins. Mitigation for that is custom SMTP, tracked separately from #25.
+- The 30 emails/hour Supabase cap is still **project-wide**, just 15× higher than before. Brevo and Supabase share no quota — the ceiling now is whichever of (Supabase's 30/hr, Brevo's daily plan quota) is tighter. Brevo SMTP and the cron's transactional API draw from the same Brevo plan quota, so heavy cron days narrow the magic-link headroom.
 - No Cloudflare WAF rate-limit rules are configured on this account; the per-IP/per-email enforcement lives entirely in the worker bindings above. A WAF rule on `POST /api/login` would be a reasonable belt-and-suspenders addition.
 - The bindings are no-ops in tests and `next dev` (the worker runtime isn't present); enforcement only kicks in after `npm run deploy`. The route handles missing bindings gracefully and falls through to Supabase, so local dev still works.
 
