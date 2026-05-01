@@ -4,6 +4,19 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+## [2026-05-01]
+
+### Added
+- `mlb_cron_runs` Supabase table — one row per authorized `/api/cron` invocation, capturing `started_at`, `finished_at`, `status` (`success` / `partial` / `failure` / `paused` / `no_subscribers` / `no_new_highlights` / `running`), `games_processed`, `emails_sent`, `errors_count`, and a jsonb `errors` array. Service-role-only via RLS-enabled-no-policies, matching the `mlb_users` view pattern (PR #87, closes #86)
+- Owner-only `/admin` dashboard at `app/admin/page.js` — gated by `ADMIN_EMAIL` Worker secret via `notFound()` so non-owners can't tell the route exists. Shows total users, emails sent in the last 7 days, last cron status with relative timestamp, a 10-run history table, and an errors panel for the latest run (PR #87, closes #86)
+- `ADMIN_EMAIL` Cloudflare Worker secret added to the `CLAUDE.md` secrets table and `.env.local.example`
+
+### Changed
+- `/api/cron` now wraps its body in a top-level try/catch and finalizes the `mlb_cron_runs` row on every exit path. Inner-loop errors that previously only hit `console.error` are now persisted to the `errors` jsonb column
+
+### Project management
+- Split #68 (umbrella "engagement + cron-health instrumentation") into three focused issues: #84 (product analytics), #85 (email engagement), #86 (cron health). Closed #68 as superseded
+
 ## [2026-04-30]
 
 ### Security

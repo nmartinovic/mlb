@@ -25,9 +25,10 @@ npm run deploy     # Deploy to Cloudflare
 ## Project Structure
 
 - `app/` — Next.js App Router pages and API routes
-  - `api/cron/` — Cron worker that checks for completed games and sends emails
+  - `api/cron/` — Cron worker that checks for completed games and sends emails; logs each run to `mlb_cron_runs`
   - `api/unsubscribe/` — Unsubscribe API
   - `dashboard/` — Team selection UI
+  - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs
   - `login/` — Magic link auth
 - `lib/` — Shared utilities
   - `mlb.js` — MLB Stats API client
