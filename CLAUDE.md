@@ -106,6 +106,25 @@ If you suspect a leak rather than a routine rotation, also: review `wrangler tai
 - Auth flow uses Supabase magic links with callback at `app/auth/callback/route.js`
 - Middleware in `middleware.js` handles session refresh
 
+## Rate limits on the magic-link flow
+
+Audited in issue #25. The login page (`app/login/page.js`) calls `supabase.auth.signInWithOtp` directly from the browser, so requests go straight to `<supabase>/auth/v1/otp` and **never traverse the Cloudflare worker or `middleware.js`**. A WAF rule on `/login` or `/api/*` would catch nothing.
+
+Effective limits today (Supabase dashboard → Auth → Rate Limits):
+
+| Bucket | Limit | Scope |
+|--------|-------|-------|
+| Sign-ups and sign-ins (`signInWithOtp`) | 30 requests / 5 min | per IP |
+| Sending emails (built-in SMTP) | 2 emails / hour | **project-wide** |
+
+Implications:
+
+- Email-flood abuse against third parties is inherently capped at 2/hour project-wide.
+- That same cap means an attacker can DoS legitimate sign-ins for ~everyone with 2 requests/hour. Mitigation is custom SMTP, not rate limiting — tracked separately from #25.
+- No Cloudflare WAF rate-limit rules are configured on this account; the magic-link path is governed entirely by the Supabase limits above.
+
+If we add more rate limiting in the future it must live behind a server-side proxy (e.g. `app/api/login/route.js`) that the login form POSTs to, since the browser-direct call to Supabase cannot be intercepted at our edge.
+
 ## Supabase schema conventions
 
 - Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
