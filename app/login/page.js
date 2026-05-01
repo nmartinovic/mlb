@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,20 +13,34 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    let res;
+    try {
+      res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      setLoading(false);
+      setError("Network error. Please try again.");
+      return;
+    }
 
     setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setSent(true);
+
+    if (res.status === 429) {
+      setError("Too many requests. Please wait a minute and try again.");
+      return;
     }
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setError(data.error || "Could not send magic link.");
+      return;
+    }
+
+    setSent(true);
   }
 
   if (sent) {
