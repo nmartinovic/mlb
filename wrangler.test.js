@@ -22,4 +22,18 @@ describe("wrangler.jsonc", () => {
     expect(config.vars?.SITE_URL).toBe("https://ninthinning.email");
     expect(config.vars?.FROM_EMAIL).toBe("highlights@ninthinning.email");
   });
+
+  it("declares per-IP and per-email rate limit bindings for /api/login (#25)", () => {
+    const bindings = config.unsafe?.bindings ?? [];
+    const byName = Object.fromEntries(bindings.map((b) => [b.name, b]));
+
+    expect(byName.LOGIN_IP_LIMITER).toMatchObject({
+      type: "ratelimit",
+      simple: { limit: 5, period: 60 },
+    });
+    expect(byName.LOGIN_EMAIL_LIMITER).toMatchObject({
+      type: "ratelimit",
+      simple: { limit: 3, period: 60 },
+    });
+  });
 });

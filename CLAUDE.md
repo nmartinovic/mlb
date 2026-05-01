@@ -106,6 +106,34 @@ If you suspect a leak rather than a routine rotation, also: review `wrangler tai
 - Auth flow uses Supabase magic links with callback at `app/auth/callback/route.js`
 - Middleware in `middleware.js` handles session refresh
 
+## Rate limits on the magic-link flow
+
+Audited and hardened in issue #25. The login form POSTs to `/api/login` (`app/api/login/route.js`), which validates the email, applies our own rate limits, and then calls `supabase.auth.signInWithOtp` server-side. The form no longer talks to Supabase directly — that's deliberate, because a browser-direct call bypasses our worker entirely and cannot be rate-limited at the edge.
+
+Two layers of limits apply:
+
+**1. Our worker (`/api/login`)** — Cloudflare Rate Limiting bindings declared in `wrangler.jsonc` under `unsafe.bindings`:
+
+| Binding | Limit | Key |
+|---------|-------|-----|
+| `LOGIN_IP_LIMITER` | 5 requests / 60s | `cf-connecting-ip` |
+| `LOGIN_EMAIL_LIMITER` | 3 requests / 60s | normalized email |
+
+Either bucket's rejection returns HTTP 429 before the request reaches Supabase. (Cloudflare's simple rate limiter only supports `period: 10` or `period: 60` seconds; per-hour buckets would need KV/D1.)
+
+**2. Supabase (Project Settings → Auth → Rate Limits)** — applies to whatever still reaches Supabase:
+
+| Bucket | Limit | Scope |
+|--------|-------|-------|
+| Sign-ups and sign-ins (`signInWithOtp`) | 30 requests / 5 min | per IP |
+| Sending emails (built-in SMTP) | 2 emails / hour | **project-wide** |
+
+Implications and known gaps:
+
+- The 2 emails/hour Supabase cap is **project-wide** — abuse-flood against third parties is inherently bounded, but so are legitimate sign-ins. Mitigation for that is custom SMTP, tracked separately from #25.
+- No Cloudflare WAF rate-limit rules are configured on this account; the per-IP/per-email enforcement lives entirely in the worker bindings above. A WAF rule on `POST /api/login` would be a reasonable belt-and-suspenders addition.
+- The bindings are no-ops in tests and `next dev` (the worker runtime isn't present); enforcement only kicks in after `npm run deploy`. The route handles missing bindings gracefully and falls through to Supabase, so local dev still works.
+
 ## Supabase schema conventions
 
 - Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
