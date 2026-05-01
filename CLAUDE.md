@@ -63,6 +63,7 @@ Anything in `wrangler.jsonc` under `vars` is **public** — it ships baked into 
 | `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase-admin.js` (cron + unsubscribe only) | Supabase project settings → API → service_role |
 | `EMAIL_API_KEY` | `lib/brevo.js` | Brevo dashboard → SMTP & API → API keys |
 | `CRON_SECRET` | `/api/cron`, `/api/test-email` (Bearer auth) | Generated locally, e.g. `openssl rand -hex 32` |
+| `ADMIN_EMAIL` | `/admin` page gating (single-user `notFound()` check) | Your Supabase auth email |
 | `EMAILS_PAUSED` *(optional)* | Cron kill switch — set to `"true"` to halt sends | Set as a Worker var when needed (see `INCIDENT.md`) |
 
 > The `NEXT_PUBLIC_*` Supabase values are technically not secret (the anon key is shipped to the browser), but they're still stored as Worker secrets so production config lives in one place rather than being split between `vars` and `secret`. RLS is what protects the Supabase data — see `supabase-schema.sql`.
