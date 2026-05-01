@@ -73,3 +73,22 @@ create view public.mlb_users as
 -- user's email. The cron worker uses service_role, which bypasses grants,
 -- so it keeps working.
 revoke all on public.mlb_users from anon, authenticated, public;
+
+-- Cron run health log (one row per /api/cron invocation that gets past auth)
+create table public.mlb_cron_runs (
+  id uuid default gen_random_uuid() primary key,
+  started_at timestamptz default now() not null,
+  finished_at timestamptz,
+  status text not null default 'running',
+  games_processed integer not null default 0,
+  emails_sent integer not null default 0,
+  errors_count integer not null default 0,
+  errors jsonb
+);
+
+create index idx_mlb_cron_runs_started_at on public.mlb_cron_runs(started_at desc);
+
+-- Service-role-only: the cron writes via service_role (bypasses RLS) and the
+-- admin page reads via service_role too. RLS is enabled with no policies, so
+-- anon/authenticated get nothing.
+alter table public.mlb_cron_runs enable row level security;
