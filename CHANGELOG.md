@@ -4,6 +4,13 @@ All notable changes to Ninth Inning Email are documented here.
 
 ## [Unreleased]
 
+### Security
+- Hardened rate limiting on the magic-link sign-in flow (closes #25). The login form previously called `supabase.auth.signInWithOtp` directly from the browser, so requests bypassed our Cloudflare worker entirely and the only rate limit was Supabase's defaults (30 req/5min per IP for sign-ins, 2 emails/hr project-wide on built-in SMTP). The form now POSTs to a new `/api/login` route which applies two `unsafe.bindings` rate limiters before calling Supabase server-side: `LOGIN_IP_LIMITER` (5 requests/60s per `cf-connecting-ip`) and `LOGIN_EMAIL_LIMITER` (3 requests/60s per normalized email). Either rejection returns 429. Audit findings and the new layer are documented in the "Rate limits on the magic-link flow" section of `CLAUDE.md` so future sessions don't re-investigate
+
+### Added
+- `app/api/login/route.test.js` covering input validation, both 429 paths, email normalization, Supabase error pass-through, and the no-binding fallback used in local dev
+- `wrangler.test.js` assertion locking in the `LOGIN_IP_LIMITER` and `LOGIN_EMAIL_LIMITER` bindings so a future config edit can't silently disable the rate limit
+
 ## [2026-05-01]
 
 ### Added
