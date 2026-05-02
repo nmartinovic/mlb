@@ -71,7 +71,9 @@ export async function GET(request) {
 
   // Early-return when no game in mlb_cron_schedule has expected_finish_at
   // inside the polling window. This is the offseason / overnight fast path
-  // (#76) — no MLB API calls, no Supabase writes, single indexed read.
+  // (#76) — no MLB API calls beyond the single indexed schedule read. Per
+  // postmortem #103 every tick still writes a heartbeat row to mlb_cron_runs
+  // (status 'skipped_no_wake') so silence is no longer ambiguous.
   const now = Date.now();
   const windowStart = new Date(now - LATE_BOUND_MS).toISOString();
   const windowEnd = new Date(now + EARLY_BOUND_MS).toISOString();
@@ -87,6 +89,8 @@ export async function GET(request) {
     // rather than dropping emails. Log so #68 dashboards surface it.
     console.error("mlb_cron_schedule read failed, falling through:", scheduleError.message);
   } else if (!activeWakes || activeWakes.length === 0) {
+    const heartbeatRunId = await startRun(supabase);
+    await finalizeRun(supabase, heartbeatRunId, "skipped_no_wake");
     return NextResponse.json({ message: "No scheduled wake within window — skipped" });
   }
 

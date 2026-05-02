@@ -144,7 +144,7 @@ Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endp
 | Cron | Endpoint | Purpose |
 |------|----------|---------|
 | `0 13 * * *` (daily, 9am ET in EDT) | `/api/cron/schedule` | Pulls today's MLB slate via `fetchDailySchedule`, upserts one row per game into `mlb_cron_schedule` with `expected_finish_at = first_pitch + 3.5h`, prunes rows older than 36h |
-| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits, no Supabase writes). Otherwise runs the full check + send fan-out |
+| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits) but still writes a `skipped_no_wake` heartbeat row to `mlb_cron_runs` (#104). Otherwise runs the full check + send fan-out |
 
 The polling window is asymmetric: `expected_finish_at` between `now - 2.5h` and `now + 30m`. Starting 30 min before the predicted finish catches short games; continuing 2.5h after catches extra innings and rain delays. Constants live at the top of `app/api/cron/route.js` (`EARLY_BOUND_MS`, `LATE_BOUND_MS`).
 
@@ -155,7 +155,7 @@ Failure modes worth knowing:
 - **Game runs longer than 6h** (extra innings + rain) → the polling window expires and the every-15-min cron stops checking. The next day's scheduler doesn't re-add yesterday's games, but the existing `getDatesToCheck` helper in `lib/mlb.js` keeps the *full-run* path looking back 2 days, so the **next** valid wake (a different team's game today) will catch the late finisher when it runs the fan-out.
 - **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
 
-`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). The early-return path intentionally writes **no** row, per #76's "exits within 50ms without hitting Supabase write paths" acceptance criterion — so an empty cron-runs hour during offseason is the success signal, not a problem.
+`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
 
 ## Supabase schema conventions
 
