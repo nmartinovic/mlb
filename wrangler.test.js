@@ -23,6 +23,10 @@ describe("wrangler.jsonc", () => {
     expect(config.vars?.FROM_EMAIL).toBe("highlights@ninthinning.email");
   });
 
+  it("wires both the 15-min main cron and the 9am ET scheduler (#76)", () => {
+    expect(config.triggers?.crons).toEqual(["*/15 * * * *", "0 13 * * *"]);
+  });
+
   it("declares per-IP and per-email rate limit bindings for /api/login (#25)", () => {
     const bindings = config.unsafe?.bindings ?? [];
     const byName = Object.fromEntries(bindings.map((b) => [b.name, b]));

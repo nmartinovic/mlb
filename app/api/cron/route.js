@@ -14,6 +14,14 @@ import { sendEmail } from "@/lib/brevo";
 
 export const maxDuration = 60;
 
+// Polling window relative to a game's expected_finish_at (#76). The window is
+// asymmetric: start polling 30m before (catches short games) and keep polling
+// for 2.5h after (catches extra innings and rain delays). If no scheduled
+// game's expected finish falls inside this window the cron exits early without
+// touching MLB Stats API or any Supabase write path.
+const EARLY_BOUND_MS = 30 * 60 * 1000;
+const LATE_BOUND_MS = 2.5 * 60 * 60 * 1000;
+
 async function startRun(supabase) {
   const { data, error } = await supabase
     .from("mlb_cron_runs")
@@ -59,6 +67,27 @@ export async function GET(request) {
     const pausedRunId = await startRun(supabase);
     await finalizeRun(supabase, pausedRunId, "paused");
     return NextResponse.json({ message: "Emails paused via kill switch" });
+  }
+
+  // Early-return when no game in mlb_cron_schedule has expected_finish_at
+  // inside the polling window. This is the offseason / overnight fast path
+  // (#76) — no MLB API calls, no Supabase writes, single indexed read.
+  const now = Date.now();
+  const windowStart = new Date(now - LATE_BOUND_MS).toISOString();
+  const windowEnd = new Date(now + EARLY_BOUND_MS).toISOString();
+  const { data: activeWakes, error: scheduleError } = await supabase
+    .from("mlb_cron_schedule")
+    .select("game_pk")
+    .gte("expected_finish_at", windowStart)
+    .lte("expected_finish_at", windowEnd)
+    .limit(1);
+
+  if (scheduleError) {
+    // Fail open: if the schedule read errors, continue with the full run
+    // rather than dropping emails. Log so #68 dashboards surface it.
+    console.error("mlb_cron_schedule read failed, falling through:", scheduleError.message);
+  } else if (!activeWakes || activeWakes.length === 0) {
+    return NextResponse.json({ message: "No scheduled wake within window — skipped" });
   }
 
   const runId = await startRun(supabase);
