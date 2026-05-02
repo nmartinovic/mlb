@@ -137,6 +137,26 @@ Implications and known gaps:
 - No Cloudflare WAF rate-limit rules are configured on this account; the per-IP/per-email enforcement lives entirely in the worker bindings above. A WAF rule on `POST /api/login` would be a reasonable belt-and-suspenders addition.
 - The bindings are no-ops in tests and `next dev` (the worker runtime isn't present); enforcement only kicks in after `npm run deploy`. The route handles missing bindings gracefully and falls through to Supabase, so local dev still works.
 
+## Cron architecture
+
+Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endpoints by `event.cron` in `scripts/inject-scheduled.mjs` (closes #76):
+
+| Cron | Endpoint | Purpose |
+|------|----------|---------|
+| `0 13 * * *` (daily, 9am ET in EDT) | `/api/cron/schedule` | Pulls today's MLB slate via `fetchDailySchedule`, upserts one row per game into `mlb_cron_schedule` with `expected_finish_at = first_pitch + 3.5h`, prunes rows older than 36h |
+| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits, no Supabase writes). Otherwise runs the full check + send fan-out |
+
+The polling window is asymmetric: `expected_finish_at` between `now - 2.5h` and `now + 30m`. Starting 30 min before the predicted finish catches short games; continuing 2.5h after catches extra innings and rain delays. Constants live at the top of `app/api/cron/route.js` (`EARLY_BOUND_MS`, `LATE_BOUND_MS`).
+
+Failure modes worth knowing:
+
+- **Schedule read fails** → main cron falls open (full run) and logs to `console.error`. A transient Supabase blip can't drop emails.
+- **Daily scheduler fails** → `mlb_cron_schedule` stays stale; the next 24h of every-15-min ticks all early-return ("no wake in window"), and emails for that day's games miss until the next morning's scheduler tick. The failure shows up as a `schedule_failure` row in `mlb_cron_runs` — watch the admin dashboard.
+- **Game runs longer than 6h** (extra innings + rain) → the polling window expires and the every-15-min cron stops checking. The next day's scheduler doesn't re-add yesterday's games, but the existing `getDatesToCheck` helper in `lib/mlb.js` keeps the *full-run* path looking back 2 days, so the **next** valid wake (a different team's game today) will catch the late finisher when it runs the fan-out.
+- **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
+
+`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). The early-return path intentionally writes **no** row, per #76's "exits within 50ms without hitting Supabase write paths" acceptance criterion — so an empty cron-runs hour during offseason is the success signal, not a problem.
+
 ## Supabase schema conventions
 
 - Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
