@@ -12,7 +12,14 @@ const STATUS_COLORS = {
   paused: "text-gray-400",
   no_subscribers: "text-gray-500",
   no_new_highlights: "text-gray-500",
+  skipped_no_wake: "text-gray-500",
+  schedule_running: "text-blue-400",
+  schedule_built: "text-green-400",
+  schedule_partial: "text-yellow-400",
+  schedule_failure: "text-red-400",
 };
+
+const SCHEDULER_STALE_HOURS = 26;
 
 function formatRelative(iso) {
   if (!iso) return "—";
@@ -24,6 +31,11 @@ function formatRelative(iso) {
   if (hr < 24) return `${hr}h ago`;
   const d = Math.round(hr / 24);
   return `${d}d ago`;
+}
+
+function hoursSince(iso) {
+  if (!iso) return null;
+  return (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
 }
 
 function formatDuration(start, end) {
@@ -47,7 +59,7 @@ export default async function AdminPage() {
   const admin = createAdminClient();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [usersRes, emailsRes, runsRes] = await Promise.all([
+  const [usersRes, emailsRes, runsRes, schedulerRes] = await Promise.all([
     admin.from("mlb_users").select("*", { count: "exact", head: true }),
     admin
       .from("mlb_sent_notifications")
@@ -58,12 +70,23 @@ export default async function AdminPage() {
       .select("*")
       .order("started_at", { ascending: false })
       .limit(10),
+    admin
+      .from("mlb_cron_runs")
+      .select("started_at,status")
+      .like("status", "schedule_%")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const totalUsers = usersRes.count ?? 0;
   const emailsLast7d = emailsRes.count ?? 0;
   const runs = runsRes.data || [];
   const lastRun = runs[0];
+  const lastSchedulerRun = schedulerRes.data || null;
+  const schedulerHoursAgo = hoursSince(lastSchedulerRun?.started_at);
+  const schedulerStale =
+    schedulerHoursAgo === null || schedulerHoursAgo > SCHEDULER_STALE_HOURS;
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -73,6 +96,12 @@ export default async function AdminPage() {
           Health snapshot for {process.env.SITE_URL || "ninthinning.email"}
         </p>
       </div>
+
+      <SchedulerBanner
+        lastRun={lastSchedulerRun}
+        hoursAgo={schedulerHoursAgo}
+        stale={schedulerStale}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat label="Total users" value={totalUsers} />
@@ -155,6 +184,30 @@ export default async function AdminPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function SchedulerBanner({ lastRun, hoursAgo, stale }) {
+  if (stale) {
+    const message =
+      hoursAgo === null
+        ? "No scheduler run logged ever — daily scheduler may be broken"
+        : `No scheduler run in ${Math.round(hoursAgo)}h — daily scheduler may be broken`;
+    return (
+      <div
+        role="alert"
+        className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm font-medium text-red-200"
+      >
+        {message}
+      </div>
+    );
+  }
+
+  const rounded = Math.max(1, Math.round(hoursAgo));
+  return (
+    <div className="mb-6 rounded-lg border border-green-900/60 bg-green-950/20 px-4 py-2 text-xs text-green-300">
+      Last scheduler run: {rounded}h ago — status: {lastRun.status}
+    </div>
   );
 }
 
