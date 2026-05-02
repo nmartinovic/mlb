@@ -92,7 +92,7 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("skips early — no MLB API, no run row — when no wake is in the window", async () => {
+  it("skips early — no MLB API — but writes a heartbeat row when no wake is in the window (#104)", async () => {
     const { client, inserted, updates } = makeSupabaseMock({ scheduleRows: [] });
     createAdminClient.mockReturnValue(client);
 
@@ -104,8 +104,17 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
       message: "No scheduled wake within window — skipped",
     });
     expect(fetchSchedule).not.toHaveBeenCalled();
-    expect(inserted).toHaveLength(0);
-    expect(updates).toHaveLength(0);
+    // One heartbeat row: insert (status: running) + update (status: skipped_no_wake).
+    expect(inserted).toEqual([{ status: "running" }]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      status: "skipped_no_wake",
+      games_processed: 0,
+      emails_sent: 0,
+      errors_count: 0,
+      errors: null,
+    });
+    expect(updates[0].finished_at).toEqual(expect.any(String));
   });
 
   it("queries mlb_cron_schedule with an asymmetric window (now-2.5h, now+30m)", async () => {
