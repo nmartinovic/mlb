@@ -11,7 +11,7 @@ Ninth Inning Email — spoiler-free MLB game recap videos delivered via email. N
 - **Database & Auth**: Supabase (Postgres + magic link auth)
 - **Email**: Brevo transactional API
 - **Styling**: Tailwind CSS v4
-- **Scheduling**: Cloudflare cron → `/api/cron` route
+- **Scheduling**: Cloudflare cron → `/api/cron` (every 15 min, early-returns when no game wake is due) + `/api/cron/schedule` (daily 9am ET, builds the wake list)
 
 ## Commands
 
@@ -25,7 +25,8 @@ npm run deploy     # Deploy to Cloudflare
 ## Project Structure
 
 - `app/` — Next.js App Router pages and API routes
-  - `api/cron/` — Cron worker that checks for completed games and sends emails; logs each run to `mlb_cron_runs`
+  - `api/cron/` — Main cron worker (every 15 min). Early-returns when `mlb_cron_schedule` has no expected_finish_at within (now-2.5h, now+30m); otherwise checks for completed games and sends emails. Logs each non-skipped run to `mlb_cron_runs`. See #76.
+  - `api/cron/schedule/` — Daily 9am ET scheduler. Pulls today's MLB slate, writes one wake per game (`first_pitch + 3.5h`) into `mlb_cron_schedule`, prunes rows older than 36h.
   - `api/unsubscribe/` — Unsubscribe API
   - `dashboard/` — Team selection UI
   - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs

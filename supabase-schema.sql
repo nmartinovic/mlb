@@ -92,3 +92,21 @@ create index idx_mlb_cron_runs_started_at on public.mlb_cron_runs(started_at des
 -- admin page reads via service_role too. RLS is enabled with no policies, so
 -- anon/authenticated get nothing.
 alter table public.mlb_cron_runs enable row level security;
+
+-- Game-aware cron schedule (#76). The daily scheduler endpoint
+-- (/api/cron/schedule) writes one row per game in today's slate with
+-- expected_finish_at = first_pitch + 3.5h. The main cron (/api/cron) reads
+-- this table and early-returns when no row's expected_finish_at falls inside
+-- the polling window (now-2.5h to now+30m), so offseason and overnight
+-- invocations exit without hitting MLB Stats API or any Supabase write path.
+create table public.mlb_cron_schedule (
+  game_pk integer primary key,
+  expected_finish_at timestamptz not null,
+  game_date date not null,
+  created_at timestamptz default now() not null
+);
+
+create index idx_mlb_cron_schedule_expected_finish on public.mlb_cron_schedule(expected_finish_at);
+
+-- Service-role-only: only the cron worker reads/writes this table.
+alter table public.mlb_cron_schedule enable row level security;
