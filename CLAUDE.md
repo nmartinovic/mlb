@@ -19,8 +19,34 @@ Ninth Inning Email — spoiler-free MLB game recap videos delivered via email. N
 npm run dev        # Local dev server
 npm run build      # Production build
 npm run preview    # Cloudflare local preview
-npm run deploy     # Deploy to Cloudflare
+npm run deploy     # Deploy to Cloudflare (then bootstrap + smoke test, see below)
 ```
+
+### `npm run deploy` post-deploy checks (#108)
+
+After `opennextjs-cloudflare deploy` succeeds, the script chains
+`node scripts/post-deploy-check.mjs`, which:
+
+1. Calls `/api/cron/schedule` with `CRON_SECRET` so `mlb_cron_schedule` is
+   populated immediately rather than waiting up to ~24h for the next natural
+   `0 13 * * *` tick. This closes the first-tick-after-deploy window that
+   caused the 2026-05-02 incident (postmortem #103).
+2. Verifies both expected cron triggers (`*/15 * * * *` and `0 13 * * *`) are
+   registered with Cloudflare via the Workers schedules API. Skipped with a
+   warning if `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are not set
+   locally; set both to enable strict verification.
+3. Asserts that if MLB has games today, at least one row was written for
+   today's `game_date`. On offseason days (no MLB slate) this is a no-op.
+
+Required local env: **`CRON_SECRET`** (the production value — keep it in a
+gitignored `.env.local` and `source` it before deploying, or export it in your
+shell). Without it, deploy exits non-zero before touching the bootstrap call,
+so a forgotten secret can't silently skip the check.
+
+Optional local env: **`CLOUDFLARE_API_TOKEN`** + **`CLOUDFLARE_ACCOUNT_ID`**
+to enable Cloudflare-side trigger verification.
+
+Any failure exits non-zero so the operator notices on the next prompt.
 
 ## Project Structure
 

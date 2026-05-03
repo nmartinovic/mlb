@@ -9,7 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "opennextjs-cloudflare build && node scripts/inject-scheduled.mjs && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && node scripts/inject-scheduled.mjs && opennextjs-cloudflare deploy"
+    "deploy": "opennextjs-cloudflare build && node scripts/inject-scheduled.mjs && opennextjs-cloudflare deploy && node scripts/post-deploy-check.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
