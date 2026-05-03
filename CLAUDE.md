@@ -157,6 +157,78 @@ Failure modes worth knowing:
 
 `mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
 
+## Out-of-band SLO alarms (#107)
+
+The `/admin` banner is passive — it only helps if the operator looks. A pg_cron job inside Supabase runs every 5 minutes and emails `ADMIN_EMAIL` directly when either silent-failure SLO trips:
+
+| SLO | Condition | Catches |
+|-----|-----------|---------|
+| **B1** (`schedule_stale_26h`) | No `schedule_*` row in `mlb_cron_runs` for 26h | Daily 9am-ET scheduler is dead |
+| **B2** (`cron_silent_30m`) | No row in `mlb_cron_runs` for 30m, **April–October ET only** | Cloudflare cron triggers themselves are down |
+
+Emails fire on `not firing → firing` edge transitions only. Recovery is silent (no "all clear" email) so a flapping SLO doesn't spam. State per SLO lives in `public.mlb_alarm_state`.
+
+The pg_cron job calls `public.mlb_check_slo_alarms()`, which uses `pg_net.http_post` to hit the Brevo transactional API directly — no Cloudflare worker involved, so this stays up even if the worker is the thing that's broken. Brevo creds come from Supabase Vault, not from Worker secrets.
+
+### One-time setup
+
+The first time you apply `supabase-schema.sql` against a project, you must:
+
+1. **Enable extensions** in Supabase dashboard → Database → Extensions: turn on `pg_cron` and `pg_net`. The `create extension if not exists` calls in the schema will then succeed; on a project where the SQL-editor role can't `CREATE EXTENSION` directly, the dashboard toggle is the only path.
+2. **Set Vault secrets** — Supabase dashboard → Project Settings → Vault → New secret (or run via SQL editor):
+   ```sql
+   select vault.create_secret('<brevo transactional key>', 'brevo_api_key');
+   select vault.create_secret('highlights@ninthinning.email', 'from_email');
+   select vault.create_secret('<your admin email>', 'admin_email');
+   ```
+   Reuse the same Brevo key as `EMAIL_API_KEY` on the Worker. To rotate, run `select vault.update_secret(id, '<new value>')`.
+
+### Verifying it's still active
+
+```sql
+-- Job is registered and active
+select jobname, schedule, active, command from cron.job where jobname = 'mlb-slo-alarms';
+
+-- Recent runs (succeeded?)
+select * from cron.job_run_details
+ where jobid = (select jobid from cron.job where jobname = 'mlb-slo-alarms')
+ order by start_time desc limit 5;
+
+-- Current SLO state
+select * from public.mlb_alarm_state;
+
+-- Recent outbound HTTP calls from pg_net (failures live here, not in raise)
+select id, status_code, error_msg, created from net._http_response order by created desc limit 5;
+```
+
+### Silencing during planned maintenance
+
+To pause both alarms (e.g. before deliberately stopping the cron for an upgrade):
+
+```sql
+select cron.unschedule('mlb-slo-alarms');
+```
+
+To resume — re-run the `do $$ ... cron.schedule('mlb-slo-alarms', ...) ... $$` block from `supabase-schema.sql`. Reset stale state if needed:
+
+```sql
+update public.mlb_alarm_state set firing = false, last_changed_at = now();
+```
+
+For very short pauses (<5 min) the simpler approach is to just expect one alarm email and ignore it — re-arming is automatic on the next non-firing tick.
+
+### Manual test
+
+```sql
+-- Force-trip B1: pretend nothing has been written for 26h+ by clearing
+-- recent schedule rows in a scratch DB, then run the function manually.
+select public.mlb_check_slo_alarms();
+-- Inspect: should send one email and flip mlb_alarm_state.firing = true.
+-- Calling again should NOT send a second email (edge-only).
+```
+
+In production, the natural test is to `cron.unschedule('main')` for the every-15-min cron in Cloudflare for >30 min during the season and confirm B2 fires within 5 min.
+
 ## Supabase schema conventions
 
 - Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
