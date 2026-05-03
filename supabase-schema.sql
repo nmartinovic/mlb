@@ -110,3 +110,173 @@ create index idx_mlb_cron_schedule_expected_finish on public.mlb_cron_schedule(e
 
 -- Service-role-only: only the cron worker reads/writes this table.
 alter table public.mlb_cron_schedule enable row level security;
+
+-- Out-of-band SLO alarms (#107). A pg_cron job runs every 5 minutes and
+-- emails ADMIN_EMAIL when either of these silent-failure SLOs trip:
+--   B1: no row with status starting 'schedule_' in mlb_cron_runs for 26h.
+--   B2: no row at all in mlb_cron_runs for 30m, during MLB regular season
+--       (April–October in America/New_York).
+-- We only email on edge transitions (not firing -> firing) so a stuck
+-- alarm doesn't spam every 5 minutes. Recovery is silent.
+--
+-- Prereqs (enable once via Supabase dashboard → Database → Extensions):
+--   - pg_cron  (lets Postgres run scheduled SQL)
+--   - pg_net   (lets SQL make outbound HTTP requests)
+-- The CREATE EXTENSION calls below are idempotent and will succeed if the
+-- extensions are already enabled. On hosted Supabase, only project owners
+-- can enable these — if these statements fail with "permission denied",
+-- enable them in the dashboard first.
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+-- Vault secrets the alarm function reads (set via Supabase dashboard →
+-- Project Settings → Vault, or `select vault.create_secret(...)`):
+--   - brevo_api_key  the same Brevo transactional key as EMAIL_API_KEY
+--   - from_email     same value as the FROM_EMAIL worker var
+--   - admin_email    same value as the ADMIN_EMAIL worker secret
+-- Storing these in Vault keeps them off disk and out of pg_dump.
+
+-- Per-SLO state. last_notified_at is informational; firing is what gates
+-- the next email. Rows are seeded below.
+create table if not exists public.mlb_alarm_state (
+  slo_id text primary key,
+  firing boolean not null default false,
+  last_changed_at timestamptz not null default now(),
+  last_notified_at timestamptz
+);
+
+alter table public.mlb_alarm_state enable row level security;
+
+insert into public.mlb_alarm_state (slo_id, firing) values
+  ('schedule_stale_26h', false),
+  ('cron_silent_30m', false)
+on conflict (slo_id) do nothing;
+
+-- Email sender. Reads Brevo creds from Vault and posts asynchronously via
+-- pg_net. pg_net.http_post returns immediately; failures land in
+-- net._http_response and do not raise here.
+create or replace function public._mlb_send_alarm_email(p_subject text, p_body text)
+returns void
+language plpgsql
+security definer
+set search_path = public, vault, net
+as $$
+declare
+  v_brevo_key text;
+  v_from text;
+  v_admin text;
+begin
+  select decrypted_secret into v_brevo_key from vault.decrypted_secrets where name = 'brevo_api_key';
+  select decrypted_secret into v_from      from vault.decrypted_secrets where name = 'from_email';
+  select decrypted_secret into v_admin     from vault.decrypted_secrets where name = 'admin_email';
+
+  if v_brevo_key is null or v_from is null or v_admin is null then
+    raise warning 'mlb_alarm: missing vault secret (brevo_api_key/from_email/admin_email); skipping send';
+    return;
+  end if;
+
+  perform net.http_post(
+    url := 'https://api.brevo.com/v3/smtp/email',
+    headers := jsonb_build_object(
+      'api-key', v_brevo_key,
+      'Content-Type', 'application/json',
+      'Accept', 'application/json'
+    ),
+    body := jsonb_build_object(
+      'sender', jsonb_build_object('email', v_from, 'name', 'Ninth Inning Alarm'),
+      'to', jsonb_build_array(jsonb_build_object('email', v_admin)),
+      'subject', p_subject,
+      'htmlContent', '<pre>' || p_body || '</pre>'
+    )
+  );
+end;
+$$;
+
+-- Evaluate both SLOs and fire on edge transitions only.
+create or replace function public.mlb_check_slo_alarms()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := now();
+  v_in_season boolean := extract(month from (v_now at time zone 'America/New_York')) between 4 and 10;
+  v_schedule_recent_count int;
+  v_cron_recent_count int;
+  v_schedule_firing boolean;
+  v_cron_firing boolean;
+  v_prev_schedule boolean;
+  v_prev_cron boolean;
+begin
+  select count(*) into v_schedule_recent_count
+  from public.mlb_cron_runs
+  where status like 'schedule_%'
+    and started_at > v_now - interval '26 hours';
+
+  select count(*) into v_cron_recent_count
+  from public.mlb_cron_runs
+  where started_at > v_now - interval '30 minutes';
+
+  v_schedule_firing := v_schedule_recent_count = 0;
+  v_cron_firing := v_in_season and v_cron_recent_count = 0;
+
+  select firing into v_prev_schedule from public.mlb_alarm_state where slo_id = 'schedule_stale_26h';
+  select firing into v_prev_cron     from public.mlb_alarm_state where slo_id = 'cron_silent_30m';
+
+  -- B1: schedule_* row missing for 26h
+  if v_schedule_firing and not coalesce(v_prev_schedule, false) then
+    perform public._mlb_send_alarm_email(
+      '[ninthinning] SLO B1 firing: scheduler silent for 26h',
+      format(
+        'No row with status starting "schedule_" has been written to mlb_cron_runs in the last 26 hours.%s' ||
+        'The daily 9am-ET scheduler (/api/cron/schedule) may be broken. Check /admin and the Cloudflare cron triggers.%s' ||
+        'Detected at: %s UTC',
+        E'\n\n', E'\n\n', v_now
+      )
+    );
+    update public.mlb_alarm_state
+       set firing = true, last_changed_at = v_now, last_notified_at = v_now
+     where slo_id = 'schedule_stale_26h';
+  elsif (not v_schedule_firing) and coalesce(v_prev_schedule, false) then
+    update public.mlb_alarm_state
+       set firing = false, last_changed_at = v_now
+     where slo_id = 'schedule_stale_26h';
+  end if;
+
+  -- B2: any row missing for 30m, in-season only
+  if v_cron_firing and not coalesce(v_prev_cron, false) then
+    perform public._mlb_send_alarm_email(
+      '[ninthinning] SLO B2 firing: cron silent for 30m',
+      format(
+        'No rows have been written to mlb_cron_runs in the last 30 minutes, and we are in MLB regular season (Apr–Oct ET).%s' ||
+        'The Cloudflare cron triggers may be down — every-15-min /api/cron should be writing a heartbeat row each tick.%s' ||
+        'Detected at: %s UTC',
+        E'\n\n', E'\n\n', v_now
+      )
+    );
+    update public.mlb_alarm_state
+       set firing = true, last_changed_at = v_now, last_notified_at = v_now
+     where slo_id = 'cron_silent_30m';
+  elsif (not v_cron_firing) and coalesce(v_prev_cron, false) then
+    update public.mlb_alarm_state
+       set firing = false, last_changed_at = v_now
+     where slo_id = 'cron_silent_30m';
+  end if;
+end;
+$$;
+
+-- Schedule: every 5 minutes. Idempotent — drops any prior schedule under
+-- the same name before re-creating, so re-running this file in the SQL
+-- editor is safe.
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'mlb-slo-alarms') then
+    perform cron.unschedule('mlb-slo-alarms');
+  end if;
+  perform cron.schedule(
+    'mlb-slo-alarms',
+    '*/5 * * * *',
+    $job$select public.mlb_check_slo_alarms()$job$
+  );
+end $$;
