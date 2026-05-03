@@ -6,6 +6,12 @@
 
 All DMCA notices, MLB rights inquiries, and takedown requests go here. Set up this address as a forwarding alias in your domain's email settings before launch.
 
+## Break-glass: manually kick the cron
+
+Primary path (per #110): open `/admin` while signed in as `ADMIN_EMAIL` and click **Run daily scheduler now** or **Run main cron now**. Both run server-side under the existing admin session check — no `CRON_SECRET` needed. The response renders inline so you can confirm what happened (e.g. *"Scheduled 15 wakes for 2026-05-02"* or *"Processed 1 games, sent 1 emails"*).
+
+This replaces the old recovery procedure (rotate `CRON_SECRET` → DevTools fetch with bearer header), which on 2026-05-02 wasted ~10 min at the start of an incident because the secret wasn't saved anywhere. If `/admin` itself is broken (e.g. Supabase auth is down), fall back to bearer-token curl against `/api/cron/schedule` and `/api/cron`.
+
 ## Kill switch
 
 To pause all outbound email sends immediately — no code deploy needed:
