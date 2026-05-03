@@ -127,6 +127,20 @@ Per-secret specifics:
 
 If you suspect a leak rather than a routine rotation, also: review `wrangler tail` for unauthorized requests over the last 24h, set `EMAILS_PAUSED=true` per `INCIDENT.md` if the leaked secret could send mail, and open an incident issue.
 
+### If you've forgotten the value (`CRON_SECRET` recovery)
+
+Distinct from planned rotation: this is the path you take mid-incident when you need to manually hit `/api/cron` (or `/api/test-email`) and don't have the current `CRON_SECRET` saved anywhere. **Note:** the `/admin` break-glass buttons (#110) are the preferred recovery path and require no secret at all — only fall back to this runbook when `/admin` itself is unavailable. The 2026-05-02 incident (see `INCIDENT.md`) is the worked example; not having the value saved blocked recovery for ~10 min.
+
+1. **Generate** a new value — any password manager, or `openssl rand -hex 32`. Save it somewhere durable *now*, before pasting it anywhere else.
+2. **Replace** in Cloudflare: dashboard → Workers & Pages → `mlb` → Settings → Variables and Secrets → edit `CRON_SECRET` → paste the new value → Save.
+3. **No deploy needed.** Cloudflare hot-swaps the secret on the next request to the worker; you do not need to run `npm run deploy` or touch `wrangler` at all.
+4. **Use it** from any `ninthinning.email` browser tab via DevTools — no terminal required:
+   ```js
+   await fetch('/api/cron', { headers: { Authorization: 'Bearer <new value>' } })
+     .then(r => r.text());
+   ```
+5. **Rotate again afterwards** if the new value got pasted anywhere persistent during recovery (chat transcripts, screenshots, an unencrypted note). Treat the recovery value as burnt and re-run steps 1–3 once the incident is closed.
+
 ## Key Patterns
 
 - Server-side Supabase client uses `supabase-server.js`; admin operations use `supabase-admin.js` (service role key)
