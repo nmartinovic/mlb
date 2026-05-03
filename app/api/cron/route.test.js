@@ -22,7 +22,19 @@ vi.mock("@/lib/brevo", () => ({
 
 // Build a supabase mock whose mlb_cron_schedule query returns a configurable
 // result. Other tables get inert no-op handlers.
-function makeSupabaseMock({ scheduleRows = [], scheduleError = null } = {}) {
+//
+// `scheduleRows` / `scheduleError` drive the windowed query (gte/lte/limit).
+// `anyRows` / `anyError` drive the unwindowed emptiness check (#109): a bare
+// `.select().limit(1)` used to distinguish "table empty (scheduler may be
+// down)" from "table populated but no row in window (offseason/overnight)".
+// Default `anyRows` to non-empty so existing tests exercise the common
+// "populated but no wake" branch.
+function makeSupabaseMock({
+  scheduleRows = [],
+  scheduleError = null,
+  anyRows = [{ game_pk: 1 }],
+  anyError = null,
+} = {}) {
   const inserted = [];
   const updates = [];
 
@@ -34,6 +46,7 @@ function makeSupabaseMock({ scheduleRows = [], scheduleError = null } = {}) {
             limit: async () => ({ data: scheduleRows, error: scheduleError }),
           }),
         }),
+        limit: async () => ({ data: anyRows, error: anyError }),
       }),
     }),
     mlb_cron_runs: () => ({
@@ -92,7 +105,9 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("skips early — no MLB API — but writes a heartbeat row when no wake is in the window (#104)", async () => {
+  it("skips early — no MLB API — but writes a heartbeat row when the table is populated and no wake is in the window (#104)", async () => {
+    // Table has rows (anyRows defaults non-empty) but none in the polling
+    // window — the common offseason / overnight case.
     const { client, inserted, updates } = makeSupabaseMock({ scheduleRows: [] });
     createAdminClient.mockReturnValue(client);
 
@@ -134,6 +149,9 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
             },
           };
         },
+        // Unwindowed emptiness check (#109): table is non-empty so the
+        // route falls into the heartbeat branch, not the in-season fall-open.
+        limit: async () => ({ data: [{ game_pk: 1 }], error: null }),
       }),
     };
 
@@ -181,6 +199,55 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     // the point is that we got past the early-return on a schedule read error.
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ message: "No subscribed teams" });
+  });
+
+  it("falls through to the full check when mlb_cron_schedule is empty during MLB season (#109)", async () => {
+    // Pin the system clock to May (in season, ET).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-15T20:00:00Z"));
+
+    const { client } = makeSupabaseMock({
+      scheduleRows: [],
+      anyRows: [], // table is entirely empty — scheduler may be down
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest());
+
+    // Mock has no subscribed teams, so the full run completes with
+    // "no_subscribers" — the point is that we got past the early-return
+    // instead of writing a skipped_no_wake heartbeat.
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ message: "No subscribed teams" });
+
+    vi.useRealTimers();
+  });
+
+  it("stays as a heartbeat when mlb_cron_schedule is empty during the offseason (#109)", async () => {
+    // Pin to January — out of season in ET.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T20:00:00Z"));
+
+    const { client, inserted, updates } = makeSupabaseMock({
+      scheduleRows: [],
+      anyRows: [], // table is empty, but offseason — expected steady state
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      message: "No scheduled wake within window — skipped",
+    });
+    expect(fetchSchedule).not.toHaveBeenCalled();
+    expect(inserted).toEqual([{ status: "running" }]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ status: "skipped_no_wake" });
+
+    vi.useRealTimers();
   });
 
   it("respects EMAILS_PAUSED and short-circuits before the schedule read", async () => {

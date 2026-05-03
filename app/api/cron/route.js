@@ -22,6 +22,21 @@ export const maxDuration = 60;
 const EARLY_BOUND_MS = 30 * 60 * 1000;
 const LATE_BOUND_MS = 2.5 * 60 * 60 * 1000;
 
+// MLB regular season runs roughly April–October ET. Used to decide whether an
+// empty mlb_cron_schedule should fail open (#109): in season we assume the
+// daily scheduler is broken and run the full check; out of season an empty
+// table is the expected steady state and we keep the cheap early-return.
+function isInMlbSeason() {
+  const month = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "numeric",
+    }).format(new Date()),
+    10
+  );
+  return month >= 4 && month <= 10;
+}
+
 async function startRun(supabase) {
   const { data, error } = await supabase
     .from("mlb_cron_runs")
@@ -89,9 +104,30 @@ export async function GET(request) {
     // rather than dropping emails. Log so #68 dashboards surface it.
     console.error("mlb_cron_schedule read failed, falling through:", scheduleError.message);
   } else if (!activeWakes || activeWakes.length === 0) {
-    const heartbeatRunId = await startRun(supabase);
-    await finalizeRun(supabase, heartbeatRunId, "skipped_no_wake");
-    return NextResponse.json({ message: "No scheduled wake within window — skipped" });
+    // No wake in window. Distinguish "table populated, just nothing due now"
+    // (the common offseason / overnight case — keep the cheap early-return)
+    // from "table is entirely empty" (the daily scheduler may be down — per
+    // #109, fail open during MLB season so a scheduler outage doesn't drop
+    // up to 24h of emails).
+    const { data: anyRows, error: anyRowsError } = await supabase
+      .from("mlb_cron_schedule")
+      .select("game_pk")
+      .limit(1);
+
+    if (anyRowsError) {
+      console.error(
+        "mlb_cron_schedule emptiness check failed, falling through:",
+        anyRowsError.message
+      );
+    } else if ((!anyRows || anyRows.length === 0) && isInMlbSeason()) {
+      console.warn(
+        "mlb_cron_schedule is empty during MLB season — scheduler may be down, falling through to full check (#109)"
+      );
+    } else {
+      const heartbeatRunId = await startRun(supabase);
+      await finalizeRun(supabase, heartbeatRunId, "skipped_no_wake");
+      return NextResponse.json({ message: "No scheduled wake within window — skipped" });
+    }
   }
 
   const runId = await startRun(supabase);
