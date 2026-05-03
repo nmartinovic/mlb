@@ -170,14 +170,14 @@ Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endp
 | Cron | Endpoint | Purpose |
 |------|----------|---------|
 | `0 13 * * *` (daily, 9am ET in EDT) | `/api/cron/schedule` | Pulls today's MLB slate via `fetchDailySchedule`, upserts one row per game into `mlb_cron_schedule` with `expected_finish_at = first_pitch + 3.5h`, prunes rows older than 36h |
-| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits) but still writes a `skipped_no_wake` heartbeat row to `mlb_cron_runs` (#104). Otherwise runs the full check + send fan-out |
+| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits) but still writes a `skipped_no_wake` heartbeat row to `mlb_cron_runs` (#104). Exception (#109): if the table is **entirely empty** during MLB regular season (ET month ∈ [4..10]) the main cron falls through to the full check rather than early-returning, so a dead daily scheduler can't drop a day of emails. Otherwise runs the full check + send fan-out |
 
 The polling window is asymmetric: `expected_finish_at` between `now - 2.5h` and `now + 30m`. Starting 30 min before the predicted finish catches short games; continuing 2.5h after catches extra innings and rain delays. Constants live at the top of `app/api/cron/route.js` (`EARLY_BOUND_MS`, `LATE_BOUND_MS`).
 
 Failure modes worth knowing:
 
 - **Schedule read fails** → main cron falls open (full run) and logs to `console.error`. A transient Supabase blip can't drop emails.
-- **Daily scheduler fails** → `mlb_cron_schedule` stays stale; the next 24h of every-15-min ticks all early-return ("no wake in window"), and emails for that day's games miss until the next morning's scheduler tick. The failure shows up as a `schedule_failure` row in `mlb_cron_runs` — watch the admin dashboard.
+- **Daily scheduler fails** → `mlb_cron_schedule` stays stale. During MLB regular season (#109) the main cron treats an entirely empty table as "scheduler may be down" and falls through to the full check on every `*/15` tick, so emails still go out (~96 extra full-run ticks/day until the scheduler recovers). Outside the season the early-return stays — an empty table is the expected steady state. The failure shows up as a `schedule_failure` row in `mlb_cron_runs` and trips SLO B1 within 26h regardless — watch the admin dashboard.
 - **Game runs longer than 6h** (extra innings + rain) → the polling window expires and the every-15-min cron stops checking. The next day's scheduler doesn't re-add yesterday's games, but the existing `getDatesToCheck` helper in `lib/mlb.js` keeps the *full-run* path looking back 2 days, so the **next** valid wake (a different team's game today) will catch the late finisher when it runs the fan-out.
 - **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
 
