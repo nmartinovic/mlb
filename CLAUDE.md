@@ -177,6 +177,18 @@ Implications and known gaps:
 - No Cloudflare WAF rate-limit rules are configured on this account; the per-IP/per-email enforcement lives entirely in the worker bindings above. A WAF rule on `POST /api/login` would be a reasonable belt-and-suspenders addition.
 - The bindings are no-ops in tests and `next dev` (the worker runtime isn't present); enforcement only kicks in after `npm run deploy`. The route handles missing bindings gracefully and falls through to Supabase, so local dev still works.
 
+## Magic-link email template and auth flow
+
+Branded in #55. The Supabase magic-link email used to ship with Supabase's default template (generic body, no product name, raw `noreply@mail.app.supabase.io` sender via implicit Amazon SES routing). It now matches the cron-recap visual language and resolves a flow mismatch that was breaking sign-in entirely.
+
+Three pieces, two of them dashboard-only:
+
+- **Sender** — covered by #97's custom-SMTP work above. `Ninth Inning Email <highlights@ninthinning.email>` with SPF/DKIM/DMARC passing, no "via" suffix in Gmail.
+- **Template** — HTML lives in `supabase/email-templates/magic-link.html` (paste-into-dashboard source of truth, not loaded at runtime). Visually mirrors `lib/email-template.js`: 520px single-column card, 6px ballpark-green accent bar, prominent CTA button using `{{ .ConfirmationURL }}` (Supabase's substitution token — do not change), footer wordmark, and the same non-affiliation disclaimer the cron emails carry. Subject is `Your Ninth Inning Email login link`. Both subject and the first body line name the product so a recipient knows the source without clicking.
+- **Auth flow (PKCE, not implicit)** — `/api/login` calls `createClient` from `@/lib/supabase-server` (the `@supabase/ssr` server client) rather than the raw `@supabase/supabase-js` client. The raw client defaults to the implicit OAuth flow, which returns tokens in the URL hash (`#access_token=...`); the SSR client defaults to PKCE, which redirects with `?code=...` query params that our `app/auth/callback/route.js` exchanges for a session via `exchangeCodeForSession`. Mixing them silently breaks sign-in: the verify step succeeds and the user lands on the redirect URL, but the hash never reaches the server callback so no session cookie is set and the user is bounced back to `/login`. This is exactly how #55 first failed in production. Keep `/api/login` on the SSR client.
+
+`emailRedirectTo` prefers `process.env.SITE_URL` and falls back to the request origin, so a misrouted request (e.g. hitting the worker on a `*.workers.dev` URL) can't ship a bad redirect. Note that Supabase only honors `emailRedirectTo` if the URL is on the **Auth → URL Configuration → Redirect URLs** allowlist; an un-allowlisted URL silently falls back to **Site URL**, which is what produced the original "lands on `/login`" symptom in #55. Required allowlist entries: `https://ninthinning.email/auth/callback` and `https://ninthinning.email/dashboard`.
+
 ## Cron architecture
 
 Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endpoints by `event.cron` in `scripts/inject-scheduled.mjs` (closes #76):
