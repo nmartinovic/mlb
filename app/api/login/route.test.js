@@ -4,7 +4,7 @@ const signInWithOtp = vi.fn();
 const createClient = vi.fn();
 const getCloudflareContext = vi.fn();
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@/lib/supabase-server", () => ({
   createClient: (...args) => createClient(...args),
 }));
 
@@ -30,7 +30,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
   delete process.env.SITE_URL;
   signInWithOtp.mockResolvedValue({ error: null });
-  createClient.mockReturnValue({ auth: { signInWithOtp } });
+  createClient.mockResolvedValue({ auth: { signInWithOtp } });
   getCloudflareContext.mockReturnValue({ env: {} });
 });
 
