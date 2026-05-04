@@ -61,7 +61,7 @@ export async function POST(request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
-  const origin = new URL(request.url).origin;
+  const origin = process.env.SITE_URL || new URL(request.url).origin;
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
