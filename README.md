@@ -87,3 +87,5 @@ middleware.js                # Session refresh middleware
 wrangler.jsonc               # Cloudflare Workers config
 supabase-schema.sql          # Database schema
 ```
+
+
