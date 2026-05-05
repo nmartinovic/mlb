@@ -1,4 +1,6 @@
 import "./globals.css";
+import { createClient } from "@/lib/supabase-server";
+import PostHogProvider from "./posthog-provider";
 
 export const metadata = {
   metadataBase: new URL(process.env.SITE_URL || "https://ninthinning.email"),
@@ -26,10 +28,16 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en">
       <body className="min-h-screen bg-[#0a1410] text-[#f5f1e6] antialiased">
+        <PostHogProvider userId={user?.id ?? null} userEmail={user?.email ?? null} />
         {children}
       </body>
     </html>

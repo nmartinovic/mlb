@@ -93,6 +93,8 @@ Anything in `wrangler.jsonc` under `vars` is **public** — it ships baked into 
 | `CRON_SECRET` | `/api/cron`, `/api/test-email` (Bearer auth) | Generated locally, e.g. `openssl rand -hex 32` |
 | `ADMIN_EMAIL` | `/admin` page gating (single-user `notFound()` check) | Your Supabase auth email |
 | `EMAILS_PAUSED` *(optional)* | Cron kill switch — set to `"true"` to halt sends | Set as a Worker var when needed (see `INCIDENT.md`) |
+| `NEXT_PUBLIC_POSTHOG_KEY` *(optional)* | Browser analytics (`lib/analytics.js`) — missing key disables tracking | PostHog → Project settings → Project API key |
+| `NEXT_PUBLIC_POSTHOG_HOST` *(optional)* | PostHog ingest host; defaults to `https://us.i.posthog.com` | PostHog dashboard URL |
 
 > The `NEXT_PUBLIC_*` Supabase values are technically not secret (the anon key is shipped to the browser), but they're still stored as Worker secrets so production config lives in one place rather than being split between `vars` and `secret`. RLS is what protects the Supabase data — see `supabase-schema.sql`.
 
@@ -293,6 +295,20 @@ select public.mlb_check_slo_alarms();
 ```
 
 In production, the natural test is to `cron.unschedule('main')` for the every-15-min cron in Cloudflare for >30 min during the season and confirm B2 fires within 5 min.
+
+## Product analytics (#94)
+
+Browser-side event tracking via PostHog. The wrapper in `lib/analytics.js` is a no-op when `NEXT_PUBLIC_POSTHOG_KEY` is unset, so dev/test/preview environments don't ship telemetry. Initialization and user identification happen in `app/posthog-provider.js`, mounted from the root layout — `app/layout.js` calls `supabase.auth.getUser()` so PostHog can `identify()` (or `reset()`) on every render.
+
+Events currently captured:
+
+| Event | Fired from | Notes |
+|-------|------------|-------|
+| `signup_completed` | `app/dashboard/signup-tracker.js` | The auth callback (`app/auth/callback/route.js`) appends `?signup=1` when `auth.users.created_at` is < 5 min old; the dashboard tracker fires once and strips the param via `router.replace` so a refresh doesn't double-count |
+| `team_selected` / `team_deselected` | `app/dashboard/team-grid.js` | Includes `team_id` in props; fired after the Supabase write resolves |
+| `unsubscribe_clicked` | `app/unsubscribe/page.js` | Anonymous (no user session), but PostHog distinct_id persists across visits |
+
+Autocapture and session recording are disabled — only the explicit events above. Pageviews and pageleaves are captured automatically by PostHog. To add a new event, import `track` from `@/lib/analytics` and call it from a `"use client"` component.
 
 ## Supabase schema conventions
 

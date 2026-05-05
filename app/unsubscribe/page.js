@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { track } from "@/lib/analytics";
 
 function UnsubscribeForm() {
   const searchParams = useSearchParams();
@@ -11,6 +12,7 @@ function UnsubscribeForm() {
 
   async function handleUnsubscribe() {
     setStatus("loading");
+    track("unsubscribe_clicked");
     const res = await fetch("/api/unsubscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

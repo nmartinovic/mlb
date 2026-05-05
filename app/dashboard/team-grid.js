@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
+import { track } from "@/lib/analytics";
 
 export default function TeamGrid({ teams, followedIds: initialFollowed }) {
   const [followed, setFollowed] = useState(new Set(initialFollowed));
@@ -29,10 +30,12 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
         .delete()
         .eq("user_id", user.id)
         .eq("team_id", teamId);
+      track("team_deselected", { team_id: teamId });
     } else {
       await supabase
         .from("mlb_user_teams")
         .insert({ user_id: user.id, team_id: teamId });
+      track("team_selected", { team_id: teamId });
     }
 
     startTransition(() => router.refresh());
