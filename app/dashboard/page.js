@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { MLB_TEAMS } from "@/lib/teams";
 import TeamGrid from "./team-grid";
+import SignupTracker from "./signup-tracker";
+import { Suspense } from "react";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -21,6 +23,9 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
+      <Suspense fallback={null}>
+        <SignupTracker />
+      </Suspense>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Your teams</h1>
