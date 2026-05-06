@@ -49,16 +49,34 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
           <button
             key={team.id}
             onClick={() => toggle(team.id)}
-            className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
+            aria-pressed={isActive}
+            className={`group relative overflow-hidden rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
               isActive
-                ? "border-blue-500 bg-blue-950 text-blue-300"
-                : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                ? "border-transparent text-[#f5f1e6] shadow-lg shadow-black/30"
+                : "border-[#1f3a2c] bg-[#0f2a1f]/40 text-[#a8a299] hover:border-[#3f6e57] hover:text-[#f5f1e6]"
             }`}
+            style={
+              isActive
+                ? { backgroundColor: team.color }
+                : undefined
+            }
           >
-            <span className="block text-xs text-gray-500">{team.abbr}</span>
-            <span className="block truncate">
-              {team.name.replace(/^(.*?)\s/, "")}
+            <span
+              className={`block text-[11px] font-semibold uppercase tracking-wider ${
+                isActive ? "text-white/80" : "text-[#a8a299]/70"
+              }`}
+            >
+              {team.abbr}
             </span>
+            <span className="mt-0.5 block truncate">{team.shortName}</span>
+            {isActive && (
+              <span
+                aria-hidden="true"
+                className="absolute right-2 top-2 text-xs text-white/90"
+              >
+                ✓
+              </span>
+            )}
           </button>
         );
       })}
