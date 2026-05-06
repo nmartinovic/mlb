@@ -20,39 +20,60 @@ export default async function DashboardPage() {
     .eq("user_id", user.id);
 
   const followedIds = new Set((userTeams || []).map((r) => r.team_id));
+  const followedCount = followedIds.size;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <Suspense fallback={null}>
-        <SignupTracker />
-      </Suspense>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Your teams</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Pick the teams you want to receive highlight recaps for.
-          </p>
-        </div>
+    <>
+      <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
+        <Link
+          href="/"
+          className="text-sm font-semibold tracking-tight text-[#f5f1e6] hover:text-white transition"
+        >
+          Ninth Inning Email
+        </Link>
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="text-sm text-gray-500 hover:text-gray-300 transition"
+            className="text-sm text-[#a8a299] hover:text-[#f5f1e6] transition"
           >
             Sign out
           </button>
         </form>
-      </div>
+      </header>
 
-      <p className="mt-1 text-xs text-gray-600">Signed in as {user.email}</p>
+      <main className="mx-auto max-w-3xl px-6 pb-16 pt-4">
+        <Suspense fallback={null}>
+          <SignupTracker />
+        </Suspense>
 
-      <Link
-        href="/dashboard/highlights"
-        className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition"
-      >
-        View recent highlights →
-      </Link>
+        <h1 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+          Your teams
+        </h1>
+        <p className="mt-2 text-[#a8a299]">
+          Tap any team to follow — we&apos;ll email a spoiler-free recap the
+          morning after each game.
+        </p>
 
-      <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
-    </main>
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+          <span className="text-[#a8a299]/80">
+            Signed in as{" "}
+            <span className="text-[#f5f1e6]">{user.email}</span>
+          </span>
+          <span className="rounded-full border border-[#1f3a2c] bg-[#0f2a1f]/60 px-2.5 py-1 font-medium text-[#a8a299]">
+            {followedCount === 0
+              ? "No teams selected"
+              : `Following ${followedCount} team${followedCount === 1 ? "" : "s"}`}
+          </span>
+          <Link
+            href="/dashboard/highlights"
+            className="font-medium text-[#a8a299] underline-offset-4 hover:text-[#f5f1e6] hover:underline transition"
+          >
+            View recent highlights →
+          </Link>
+        </div>
+
+        <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
+      </main>
+    </>
   );
 }

@@ -177,7 +177,7 @@ export default function Home() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-10 sm:grid-cols-3">
           <Stat value="30" label="MLB teams supported" />
           <Stat value="0" label="Scores spoiled" />
-          <Stat value="~1" label="Email per game day, per team" />
+          <Stat value="1" label="Email per team, per game day" />
         </div>
       </section>
 
@@ -259,17 +259,26 @@ export default function Home() {
         </h2>
         <div className="mt-8 space-y-3">
           <FaqItem q="Is it free?">
-            Yes. Ninth Inning Email is free for personal use. There's a tip
-            link if you want to chip in for hosting, but nothing is gated.
+            Yes. Ninth Inning Email is free for personal use. There&apos;s a
+            tip link if you want to chip in for hosting, but nothing is gated.
           </FaqItem>
           <FaqItem q="Will I see the score by accident?">
             No. The email subject and body are written to be spoiler-free —
             no scores, no outcomes, no who-won-what. The link sends you to
             the official MLB.com video page for the recap.
           </FaqItem>
+          <FaqItem q="When will I get the email?">
+            The morning after the game wraps up. Most days, that means the
+            email lands before you&apos;ve had your first cup of coffee.
+          </FaqItem>
+          <FaqItem q="Can I follow more than one team?">
+            Yes — follow as many of the 30 MLB teams as you want. You&apos;ll
+            get one email per team per game day.
+          </FaqItem>
           <FaqItem q="Does it work in the postseason?">
-            Yes. As long as MLB publishes a recap video for the game, you'll
-            get it the next morning, including the playoffs and World Series.
+            Yes. As long as MLB publishes a recap video for the game,
+            you&apos;ll get it the next morning, including the playoffs and
+            World Series.
           </FaqItem>
         </div>
       </section>
