@@ -13,18 +13,18 @@ export const metadata = {
   keywords: ["MLB", "baseball", "highlights", "spoiler-free", "recap", "email"],
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Ninth Inning Email — Spoiler-free MLB recaps",
+    title: "Ninth Inning Email — Spoiler-Free MLB Game Recaps",
     description:
-      "Pick your teams. We email the recap. No scores, no spoilers.",
+      "Get a spoiler-free highlight reel in your inbox after every game your team plays. No scores. No spoilers. Just the best plays.",
     url: "/",
     siteName: "Ninth Inning Email",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ninth Inning Email — Spoiler-free MLB recaps",
+    title: "Ninth Inning Email — Spoiler-Free MLB Game Recaps",
     description:
-      "Pick your teams. We email the recap. No scores, no spoilers.",
+      "Get a spoiler-free highlight reel in your inbox after every game your team plays. No scores. No spoilers. Just the best plays.",
   },
 };
 
