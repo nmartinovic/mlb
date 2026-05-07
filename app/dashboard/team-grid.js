@@ -36,6 +36,10 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
         .from("mlb_user_teams")
         .insert({ user_id: user.id, team_id: teamId });
       track("team_selected", { team_id: teamId });
+      // Fire-and-forget: the API route is idempotent (sentinel row in
+      // mlb_sent_notifications), so calling on every add is safe and only
+      // the first one sends mail.
+      fetch("/api/welcome", { method: "POST" }).catch(() => {});
     }
 
     startTransition(() => router.refresh());

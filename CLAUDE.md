@@ -310,6 +310,16 @@ Events currently captured:
 
 Autocapture and session recording are disabled — only the explicit events above. Pageviews and pageleaves are captured automatically by PostHog. To add a new event, import `track` from `@/lib/analytics` and call it from a `"use client"` component.
 
+## Welcome email (#26)
+
+A one-time welcome email fires the first time a user adds a team in `/dashboard`. The trigger lives client-side in `app/dashboard/team-grid.js` — after a successful insert into `mlb_user_teams`, it fires-and-forgets a POST to `/api/welcome`.
+
+`POST /api/welcome` (`app/api/welcome/route.js`) authenticates via the Supabase session (no `CRON_SECRET` required), confirms the user has at least one team, and delegates to `sendWelcomeEmailIfNeeded` in `lib/welcome-email.js`.
+
+Idempotency uses a sentinel row in `mlb_sent_notifications` with `game_pk = 0` (no schema change). The helper does claim-then-send: insert the sentinel first, then send. If the insert fails with Postgres `23505` (unique violation), a previous call already won and we skip. If `sendEmail` throws, the sentinel is rolled back so a retry can succeed. This makes "remove all teams, re-add" a no-op — the sentinel persists.
+
+The email template is `buildWelcomeEmailHtml` in `lib/email-template.js`. Same 520px card layout as the recap email but with a brand-green accent (no team color, since there's no team), three "how it works" bullets, and a CTA back to `/dashboard`.
+
 ## Supabase schema conventions
 
 - Every `mlb_*` table has RLS enabled with per-`auth.uid()` policies; the cron worker uses `service_role` (which bypasses RLS) so adding RLS doesn't break the fan-out.
