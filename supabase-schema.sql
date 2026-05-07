@@ -19,7 +19,10 @@ create table public.mlb_game_cache (
   checked_at timestamptz default now() not null
 );
 
--- Sent notification tracking (prevents duplicate emails)
+-- Sent notification tracking (prevents duplicate emails).
+-- Sentinel: game_pk = 0 marks "welcome email sent" for that user (issue #26).
+-- The unique (user_id, game_pk) constraint enforces idempotency atomically,
+-- so two concurrent first-team adds can't both win the welcome-send race.
 create table public.mlb_sent_notifications (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,
