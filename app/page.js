@@ -149,10 +149,10 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
-                  href="/login"
+                  href="/login?next=signup"
                   className="rounded-lg bg-[#c41e3a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#d92645] transition"
                 >
-                  Get my recaps
+                  Pick my teams
                 </Link>
                 <a
                   href="#sample"
@@ -295,10 +295,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex justify-center">
             <Link
-              href="/login"
+              href="/login?next=signup"
               className="rounded-lg bg-[#c41e3a] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#d92645] transition"
             >
-              Get my recaps
+              Pick my teams
             </Link>
           </div>
         </div>

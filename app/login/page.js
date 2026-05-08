@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const isSignup = searchParams.get("next") === "signup";
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
@@ -83,10 +86,12 @@ export default function LoginPage() {
           ) : (
             <>
               <h1 className="text-2xl font-bold tracking-tight text-center text-[#f5f1e6]">
-                Sign in
+                {isSignup ? "Get your recaps" : "Sign in"}
               </h1>
               <p className="mt-2 text-center text-sm text-[#a8a299]">
-                Enter your email and we&apos;ll send you a magic link.
+                {isSignup
+                  ? "Enter your email — we'll send a magic link, then you can pick your teams."
+                  : "Enter your email and we'll send you a magic link."}
               </p>
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-3">
@@ -118,5 +123,13 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
