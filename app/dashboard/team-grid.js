@@ -7,7 +7,7 @@ import { track } from "@/lib/analytics";
 
 export default function TeamGrid({ teams, followedIds: initialFollowed }) {
   const [followed, setFollowed] = useState(new Set(initialFollowed));
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
   async function toggle(teamId) {
@@ -54,29 +54,42 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
             key={team.id}
             onClick={() => toggle(team.id)}
             aria-pressed={isActive}
-            className={`group relative overflow-hidden rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
+            aria-label={`${isActive ? "Unfollow" : "Follow"} ${team.name}`}
+            className={`group relative flex min-h-[64px] w-full flex-col justify-center overflow-hidden rounded-xl border px-4 py-3 text-left text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1410] ${
               isActive
                 ? "border-transparent text-[#f5f1e6] shadow-lg shadow-black/30"
-                : "border-[#1f3a2c] bg-[#0f2a1f]/40 text-[#a8a299] hover:border-[#3f6e57] hover:text-[#f5f1e6]"
+                : "border-[#1f3a2c] bg-[#0f2a1f]/40 text-[#a8a299] hover:border-[#3f6e57] hover:bg-[#0f2a1f]/60 hover:text-[#f5f1e6]"
             }`}
             style={
               isActive
-                ? { backgroundColor: team.color }
+                ? {
+                    backgroundColor: team.color,
+                    // Use the team color as the focus ring on selected cards
+                    // so the visible state and the focus state agree.
+                    "--tw-ring-color": team.color,
+                  }
                 : undefined
             }
           >
             <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 w-1"
+              style={{ backgroundColor: isActive ? "rgba(255,255,255,0.6)" : team.color }}
+            />
+            <span
               className={`block text-[11px] font-semibold uppercase tracking-wider ${
-                isActive ? "text-white/80" : "text-[#a8a299]/70"
+                isActive ? "text-white/90" : "text-[#a8a299]/80"
               }`}
             >
               {team.abbr}
             </span>
-            <span className="mt-0.5 block truncate">{team.shortName}</span>
+            <span className="mt-0.5 block truncate text-[15px]">
+              {team.shortName}
+            </span>
             {isActive && (
               <span
                 aria-hidden="true"
-                className="absolute right-2 top-2 text-xs text-white/90"
+                className="absolute right-2 top-2 text-xs font-bold text-white/95"
               >
                 ✓
               </span>
