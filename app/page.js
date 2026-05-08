@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TEAMS_BY_ID } from "@/lib/teams";
+import { createClient } from "@/lib/supabase-server";
 
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
@@ -106,8 +107,15 @@ function FaqItem({ q, children }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
   const tipUrl = process.env.TIP_URL;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isSignedIn = Boolean(user);
+  const ctaHref = isSignedIn ? "/dashboard" : "/login?next=signup";
+  const ctaLabel = isSignedIn ? "Manage my teams" : "Pick my teams";
 
   return (
     <div className="min-h-screen">
@@ -117,10 +125,10 @@ export default function Home() {
           Ninth Inning Email
         </span>
         <Link
-          href="/login"
+          href={isSignedIn ? "/dashboard" : "/login"}
           className="text-sm font-medium text-[#a8a299] hover:text-[#f5f1e6] transition"
         >
-          Sign in
+          {isSignedIn ? "Dashboard" : "Sign in"}
         </Link>
       </header>
 
@@ -149,10 +157,10 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
-                  href="/login?next=signup"
+                  href={ctaHref}
                   className="rounded-lg bg-[#c41e3a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#d92645] transition"
                 >
-                  Pick my teams
+                  {ctaLabel}
                 </Link>
                 <a
                   href="#sample"
@@ -295,10 +303,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex justify-center">
             <Link
-              href="/login?next=signup"
+              href={ctaHref}
               className="rounded-lg bg-[#c41e3a] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#d92645] transition"
             >
-              Pick my teams
+              {ctaLabel}
             </Link>
           </div>
         </div>
@@ -312,8 +320,11 @@ export default function Home() {
             sponsored by MLB or any MLB club. Video links courtesy of MLB.com.
           </p>
           <div className="flex items-center gap-5">
-            <Link href="/login" className="hover:text-[#f5f1e6] transition">
-              Sign in
+            <Link
+              href={isSignedIn ? "/dashboard" : "/login"}
+              className="hover:text-[#f5f1e6] transition"
+            >
+              {isSignedIn ? "Dashboard" : "Sign in"}
             </Link>
             <Link
               href="/unsubscribe"
