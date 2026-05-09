@@ -3,10 +3,15 @@ import { TEAMS_BY_ID } from "@/lib/teams";
 
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
-function EmailPreview({ size = "sm" }) {
+function EmailPreview({ size = "sm", showInboxRow = false }) {
   const team = TEAMS_BY_ID[PREVIEW_TEAM_ID];
+  const lastName = team.name.split(" ").slice(-1)[0];
   const today = new Date().toLocaleDateString("en-US", {
     month: "long",
+    day: "numeric",
+  });
+  const shortDate = new Date().toLocaleDateString("en-US", {
+    month: "short",
     day: "numeric",
   });
   const isLarge = size === "lg";
@@ -22,6 +27,35 @@ function EmailPreview({ size = "sm" }) {
           Preview
         </span>
       </div>
+      {showInboxRow && (
+        <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
+          <div className="flex items-start gap-3 px-4 py-3">
+            <div
+              className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+              style={{ backgroundColor: team.color }}
+              aria-hidden="true"
+            >
+              {team.abbr}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="truncate text-sm font-semibold text-gray-900">
+                  Ninth Inning Email
+                </span>
+                <span className="flex-shrink-0 text-[11px] text-gray-500">
+                  {shortDate}
+                </span>
+              </div>
+              <div className="truncate text-sm text-gray-800">
+                {lastName} highlights are ready
+              </div>
+              <div className="truncate text-xs text-gray-500">
+                Your spoiler-free recap is one click away — no score in sight.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/10">
         <div
           className="h-1.5"
@@ -144,21 +178,21 @@ export default function Home() {
                 Spoiler-free MLB recaps in your inbox.
               </h1>
               <p className="mt-5 text-lg text-[#a8a299] sm:text-xl">
-                Pick your teams. We email the recap the next morning. No
-                scores, no spoilers — just the highlights.
+                Pick your teams. We email the recap the next morning — no
+                score in sight.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+              <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
                   href="/login"
-                  className="rounded-lg bg-[#c41e3a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#d92645] transition"
+                  className="w-full rounded-lg bg-[#c41e3a] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#d92645] transition sm:w-auto"
                 >
                   Get my recaps
                 </Link>
                 <a
                   href="#sample"
-                  className="rounded-lg border border-[#2d5240] px-6 py-3 text-sm font-semibold text-[#f5f1e6] hover:border-[#3f6e57] transition"
+                  className="text-sm font-medium text-[#a8a299] hover:text-[#f5f1e6] transition"
                 >
-                  See a sample email
+                  See a sample email &rarr;
                 </a>
               </div>
               <p className="mt-4 text-xs text-[#a8a299]">
@@ -176,7 +210,7 @@ export default function Home() {
       <section className="border-y border-[#1f3a2c] bg-[#0a1410]/60">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-10 sm:grid-cols-3">
           <Stat value="30" label="MLB teams supported" />
-          <Stat value="0" label="Scores spoiled" />
+          <Stat value="Zero" label="Spoilers, ever" />
           <Stat value="~1" label="Email per game day, per team" />
         </div>
       </section>
@@ -222,7 +256,7 @@ export default function Home() {
             </p>
           </div>
           <div className="mt-12">
-            <EmailPreview size="lg" />
+            <EmailPreview size="lg" showInboxRow />
           </div>
         </div>
       </section>
@@ -258,18 +292,55 @@ export default function Home() {
           Questions
         </h2>
         <div className="mt-8 space-y-3">
-          <FaqItem q="Is it free?">
-            Yes. Ninth Inning Email is free for personal use. There's a tip
-            link if you want to chip in for hosting, but nothing is gated.
+          <FaqItem q="Is it really free?">
+            Yes. Ninth Inning Email is free for personal use, with no plans
+            to gate anything behind a paywall. There's a tip link if you
+            want to chip in for hosting — that's it.
           </FaqItem>
           <FaqItem q="Will I see the score by accident?">
             No. The email subject and body are written to be spoiler-free —
             no scores, no outcomes, no who-won-what. The link sends you to
             the official MLB.com video page for the recap.
           </FaqItem>
-          <FaqItem q="Does it work in the postseason?">
-            Yes. As long as MLB publishes a recap video for the game, you'll
-            get it the next morning, including the playoffs and World Series.
+          <FaqItem q="How many emails will I get?">
+            Roughly one per team, per game day. If you follow one team that
+            usually means about 5 emails a week during the regular season.
+            If you follow all 30, expect a busier inbox on a full slate.
+          </FaqItem>
+          <FaqItem q="When does the email arrive?">
+            The morning after the game. Most recaps are out before 9am ET.
+            Late finishers (extra innings, rain delays, West Coast games)
+            may slide a little later but still land before lunchtime.
+          </FaqItem>
+          <FaqItem q="What about doubleheaders or postseason games?">
+            Both work. You'll get a recap for every game MLB publishes a
+            highlight video for — regular season, playoffs, and the World
+            Series.
+          </FaqItem>
+          <FaqItem q="Can I pause emails while I'm on vacation?">
+            Not yet. For now, the cleanest options are to unsubscribe (and
+            sign back up later) or to remove your teams from the dashboard.
+            A pause toggle is on the roadmap.
+          </FaqItem>
+          <FaqItem q="What data do you collect?">
+            Just your email address, the teams you follow, and a log of
+            which recaps we've sent you. No tracking, no ads, no name. See
+            the{" "}
+            <Link href="/privacy" className="underline hover:text-[#f5f1e6] transition">
+              privacy page
+            </Link>{" "}
+            for the full list.
+          </FaqItem>
+          <FaqItem q="How do I delete my account?">
+            Email{" "}
+            <a
+              href="mailto:highlights@ninthinning.email?subject=Delete%20my%20account"
+              className="underline hover:text-[#f5f1e6] transition"
+            >
+              highlights@ninthinning.email
+            </a>{" "}
+            from the address you signed up with and we'll wipe everything
+            within 7 days. Self-serve deletion is on the roadmap.
           </FaqItem>
         </div>
       </section>
@@ -306,11 +377,8 @@ export default function Home() {
             <Link href="/login" className="hover:text-[#f5f1e6] transition">
               Sign in
             </Link>
-            <Link
-              href="/unsubscribe"
-              className="hover:text-[#f5f1e6] transition"
-            >
-              Unsubscribe
+            <Link href="/privacy" className="hover:text-[#f5f1e6] transition">
+              Privacy
             </Link>
           </div>
         </div>

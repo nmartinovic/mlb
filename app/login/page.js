@@ -46,11 +46,32 @@ export default function LoginPage() {
   if (sent) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center px-6">
-        <div className="max-w-sm text-center">
+        <div className="max-w-md text-center">
           <h1 className="text-2xl font-bold">Check your email</h1>
           <p className="mt-3 text-gray-400">
-            We sent a magic link to <span className="text-white">{email}</span>.
-            Click it to sign in.
+            We sent a magic link to{" "}
+            <span className="text-white">{email}</span>. Click it to sign in.
+          </p>
+          <p className="mt-4 text-sm text-gray-500">
+            It usually arrives within a minute. If you don't see it, check
+            your spam folder — the email is from{" "}
+            <span className="text-gray-300">
+              highlights@ninthinning.email
+            </span>
+            .
+          </p>
+          <p className="mt-6 text-xs text-gray-500">
+            Wrong address?{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setEmail("");
+              }}
+              className="underline hover:text-gray-300 transition"
+            >
+              Try another email
+            </button>
           </p>
         </div>
       </main>
