@@ -80,7 +80,25 @@ function LoginForm() {
                 sign in.
               </p>
               <p className="mt-4 text-xs text-[#a8a299]/80">
-                It can take a minute. Don&apos;t forget to check spam.
+                It usually arrives within a minute. If you don&apos;t see it,
+                check your spam folder &mdash; the email is from{" "}
+                <span className="text-[#a8a299]">
+                  highlights@ninthinning.email
+                </span>
+                .
+              </p>
+              <p className="mt-5 text-xs text-[#a8a299]/80">
+                Wrong address?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSent(false);
+                    setEmail("");
+                  }}
+                  className="underline hover:text-[#f5f1e6] transition"
+                >
+                  Try another email
+                </button>
               </p>
             </div>
           ) : (
