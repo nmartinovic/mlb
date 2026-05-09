@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import BreakGlass from "./break-glass";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,8 @@ export default async function AdminPage() {
         hoursAgo={schedulerHoursAgo}
         stale={schedulerStale}
       />
+
+      <BreakGlass />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat label="Total users" value={totalUsers} />

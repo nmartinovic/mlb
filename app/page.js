@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TEAMS_BY_ID } from "@/lib/teams";
+import { createClient } from "@/lib/supabase-server";
 
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
@@ -140,8 +141,15 @@ function FaqItem({ q, children }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
   const tipUrl = process.env.TIP_URL;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isSignedIn = Boolean(user);
+  const ctaHref = isSignedIn ? "/dashboard" : "/login?next=signup";
+  const ctaLabel = isSignedIn ? "Manage my teams" : "Pick my teams";
 
   return (
     <div className="min-h-screen">
@@ -151,10 +159,10 @@ export default function Home() {
           Ninth Inning Email
         </span>
         <Link
-          href="/login"
+          href={isSignedIn ? "/dashboard" : "/login"}
           className="text-sm font-medium text-[#a8a299] hover:text-[#f5f1e6] transition"
         >
-          Sign in
+          {isSignedIn ? "Dashboard" : "Sign in"}
         </Link>
       </header>
 
@@ -183,10 +191,10 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
-                  href="/login"
+                  href={ctaHref}
                   className="w-full rounded-lg bg-[#c41e3a] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#d92645] transition sm:w-auto"
                 >
-                  Get my recaps
+                  {ctaLabel}
                 </Link>
                 <a
                   href="#sample"
@@ -211,7 +219,7 @@ export default function Home() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-10 sm:grid-cols-3">
           <Stat value="30" label="MLB teams supported" />
           <Stat value="Zero" label="Spoilers, ever" />
-          <Stat value="~1" label="Email per game day, per team" />
+          <Stat value="1" label="Email per team, per game day" />
         </div>
       </section>
 
@@ -294,13 +302,17 @@ export default function Home() {
         <div className="mt-8 space-y-3">
           <FaqItem q="Is it really free?">
             Yes. Ninth Inning Email is free for personal use, with no plans
-            to gate anything behind a paywall. There's a tip link if you
-            want to chip in for hosting — that's it.
+            to gate anything behind a paywall. There&apos;s a tip link if you
+            want to chip in for hosting &mdash; that&apos;s it.
           </FaqItem>
           <FaqItem q="Will I see the score by accident?">
             No. The email subject and body are written to be spoiler-free —
             no scores, no outcomes, no who-won-what. The link sends you to
             the official MLB.com video page for the recap.
+          </FaqItem>
+          <FaqItem q="Can I follow more than one team?">
+            Yes &mdash; follow as many of the 30 MLB teams as you want.
+            You&apos;ll get one email per team per game day.
           </FaqItem>
           <FaqItem q="How many emails will I get?">
             Roughly one per team, per game day. If you follow one team that
@@ -313,9 +325,9 @@ export default function Home() {
             may slide a little later but still land before lunchtime.
           </FaqItem>
           <FaqItem q="What about doubleheaders or postseason games?">
-            Both work. You'll get a recap for every game MLB publishes a
-            highlight video for — regular season, playoffs, and the World
-            Series.
+            Both work. You&apos;ll get a recap for every game MLB publishes
+            a highlight video for &mdash; regular season, playoffs, and the
+            World Series.
           </FaqItem>
           <FaqItem q="Can I pause emails while I'm on vacation?">
             Not yet. For now, the cleanest options are to unsubscribe (and
@@ -324,8 +336,8 @@ export default function Home() {
           </FaqItem>
           <FaqItem q="What data do you collect?">
             Just your email address, the teams you follow, and a log of
-            which recaps we've sent you. No tracking, no ads, no name. See
-            the{" "}
+            which recaps we&apos;ve sent you. No tracking, no ads, no name.
+            See the{" "}
             <Link href="/privacy" className="underline hover:text-[#f5f1e6] transition">
               privacy page
             </Link>{" "}
@@ -339,8 +351,8 @@ export default function Home() {
             >
               highlights@ninthinning.email
             </a>{" "}
-            from the address you signed up with and we'll wipe everything
-            within 7 days. Self-serve deletion is on the roadmap.
+            from the address you signed up with and we&apos;ll wipe
+            everything within 7 days. Self-serve deletion is on the roadmap.
           </FaqItem>
         </div>
       </section>
@@ -357,10 +369,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex justify-center">
             <Link
-              href="/login"
+              href={ctaHref}
               className="rounded-lg bg-[#c41e3a] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#d92645] transition"
             >
-              Get my recaps
+              {ctaLabel}
             </Link>
           </div>
         </div>
@@ -374,8 +386,11 @@ export default function Home() {
             sponsored by MLB or any MLB club. Video links courtesy of MLB.com.
           </p>
           <div className="flex items-center gap-5">
-            <Link href="/login" className="hover:text-[#f5f1e6] transition">
-              Sign in
+            <Link
+              href={isSignedIn ? "/dashboard" : "/login"}
+              className="hover:text-[#f5f1e6] transition"
+            >
+              {isSignedIn ? "Dashboard" : "Sign in"}
             </Link>
             <Link href="/privacy" className="hover:text-[#f5f1e6] transition">
               Privacy

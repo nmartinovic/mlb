@@ -4,7 +4,7 @@ const signInWithOtp = vi.fn();
 const createClient = vi.fn();
 const getCloudflareContext = vi.fn();
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@/lib/supabase-server", () => ({
   createClient: (...args) => createClient(...args),
 }));
 
@@ -28,8 +28,9 @@ beforeEach(() => {
   vi.resetModules();
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+  delete process.env.SITE_URL;
   signInWithOtp.mockResolvedValue({ error: null });
-  createClient.mockReturnValue({ auth: { signInWithOtp } });
+  createClient.mockResolvedValue({ auth: { signInWithOtp } });
   getCloudflareContext.mockReturnValue({ env: {} });
 });
 
@@ -104,6 +105,26 @@ describe("POST /api/login", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: "user@example.com",
+      options: {
+        emailRedirectTo: "https://ninthinning.email/auth/callback",
+      },
+    });
+  });
+
+  it("uses SITE_URL for emailRedirectTo when set, regardless of request origin", async () => {
+    process.env.SITE_URL = "https://ninthinning.email";
+    const { POST } = await import("./route");
+
+    const req = new Request("https://mlb.workers.dev/api/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "user@example.com" }),
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
     expect(signInWithOtp).toHaveBeenCalledWith({
       email: "user@example.com",
       options: {

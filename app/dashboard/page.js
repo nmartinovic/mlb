@@ -3,6 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { MLB_TEAMS } from "@/lib/teams";
 import TeamGrid from "./team-grid";
+import SignupTracker from "./signup-tracker";
+import { Suspense } from "react";
+import pkg from "../../package.json";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,36 +21,101 @@ export default async function DashboardPage() {
     .eq("user_id", user.id);
 
   const followedIds = new Set((userTeams || []).map((r) => r.team_id));
+  const followedCount = followedIds.size;
+  const tipUrl = process.env.TIP_URL;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Your teams</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Pick the teams you want to receive highlight recaps for.
-          </p>
-        </div>
+    <div className="flex min-h-screen flex-col">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+        <Link
+          href="/"
+          className="text-sm font-semibold tracking-tight text-[#f5f1e6] transition hover:text-white"
+        >
+          Ninth Inning Email
+        </Link>
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="text-sm text-gray-500 hover:text-gray-300 transition"
+            className="text-sm font-medium text-[#a8a299] transition hover:text-[#f5f1e6]"
           >
             Sign out
           </button>
         </form>
-      </div>
+      </header>
 
-      <p className="mt-1 text-xs text-gray-600">Signed in as {user.email}</p>
+      <main className="flex-1">
+        <section className="relative overflow-hidden">
+          <div
+            className="pointer-events-none absolute inset-0 -z-10 opacity-70"
+            style={{
+              background:
+                "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(15,81,50,0.45), transparent 70%)",
+            }}
+            aria-hidden="true"
+          />
+          <div className="mx-auto max-w-3xl px-6 pb-16 pt-4 sm:pt-8">
+            <Suspense fallback={null}>
+              <SignupTracker />
+            </Suspense>
 
-      <Link
-        href="/dashboard/highlights"
-        className="mt-4 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition"
-      >
-        View recent highlights →
-      </Link>
+            <h1 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+              Your teams
+            </h1>
+            <p className="mt-2 text-[#a8a299]">
+              Tap any team to follow — we&apos;ll email a spoiler-free recap the
+              morning after each game.
+            </p>
 
-      <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
-    </main>
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+              <span className="text-[#a8a299]/80">
+                Signed in as{" "}
+                <span className="text-[#f5f1e6]">{user.email}</span>
+              </span>
+              <span className="rounded-full border border-[#1f3a2c] bg-[#0f2a1f]/60 px-2.5 py-1 font-medium text-[#a8a299]">
+                {followedCount === 0
+                  ? "No teams selected"
+                  : `Following ${followedCount} team${followedCount === 1 ? "" : "s"}`}
+              </span>
+              <Link
+                href="/dashboard/highlights"
+                className="font-medium text-[#a8a299] underline-offset-4 transition hover:text-[#f5f1e6] hover:underline"
+              >
+                View recent highlights →
+              </Link>
+            </div>
+
+            <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
+          </div>
+        </section>
+      </main>
+
+      <footer className="mt-12 border-t border-[#1f3a2c]">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-xs text-[#a8a299] sm:flex-row">
+          <p className="text-center sm:text-left">
+            Ninth Inning Email is not affiliated with, endorsed by, or
+            sponsored by MLB or any MLB club. Video links courtesy of MLB.com.
+          </p>
+          <div className="flex items-center gap-5">
+            {tipUrl && (
+              <a
+                href={tipUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition hover:text-[#f5f1e6]"
+              >
+                Tip the developer
+              </a>
+            )}
+            <Link
+              href="/unsubscribe"
+              className="transition hover:text-[#f5f1e6]"
+            >
+              Unsubscribe
+            </Link>
+            <span className="text-[#a8a299]/60">v{pkg.version}</span>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

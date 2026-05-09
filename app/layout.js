@@ -1,4 +1,6 @@
 import "./globals.css";
+import { createClient } from "@/lib/supabase-server";
+import PostHogProvider from "./posthog-provider";
 
 export const metadata = {
   metadataBase: new URL(process.env.SITE_URL || "https://ninthinning.email"),
@@ -11,25 +13,31 @@ export const metadata = {
   keywords: ["MLB", "baseball", "highlights", "spoiler-free", "recap", "email"],
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Ninth Inning Email — Spoiler-free MLB recaps",
+    title: "Ninth Inning Email — Spoiler-Free MLB Game Recaps",
     description:
-      "Pick your teams. We email the recap. No scores, no spoilers.",
+      "Get a spoiler-free highlight reel in your inbox after every game your team plays. No scores. No spoilers. Just the best plays.",
     url: "/",
     siteName: "Ninth Inning Email",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ninth Inning Email — Spoiler-free MLB recaps",
+    title: "Ninth Inning Email — Spoiler-Free MLB Game Recaps",
     description:
-      "Pick your teams. We email the recap. No scores, no spoilers.",
+      "Get a spoiler-free highlight reel in your inbox after every game your team plays. No scores. No spoilers. Just the best plays.",
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en">
       <body className="min-h-screen bg-[#0a1410] text-[#f5f1e6] antialiased">
+        <PostHogProvider userId={user?.id ?? null} userEmail={user?.email ?? null} />
         {children}
       </body>
     </html>

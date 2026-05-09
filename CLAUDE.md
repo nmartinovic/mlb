@@ -55,7 +55,7 @@ Any failure exits non-zero so the operator notices on the next prompt.
   - `api/cron/schedule/` — Daily 9am ET scheduler. Pulls today's MLB slate, writes one wake per game (`first_pitch + 3.5h`) into `mlb_cron_schedule`, prunes rows older than 36h.
   - `api/unsubscribe/` — Unsubscribe API
   - `dashboard/` — Team selection UI
-  - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs
+  - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs. Also exposes break-glass "Run daily scheduler now" / "Run main cron now" buttons (#110) — see "Break-glass recovery" below
   - `login/` — Magic link auth
 - `lib/` — Shared utilities
   - `mlb.js` — MLB Stats API client
@@ -93,6 +93,8 @@ Anything in `wrangler.jsonc` under `vars` is **public** — it ships baked into 
 | `CRON_SECRET` | `/api/cron`, `/api/test-email` (Bearer auth) | Generated locally, e.g. `openssl rand -hex 32` |
 | `ADMIN_EMAIL` | `/admin` page gating (single-user `notFound()` check) | Your Supabase auth email |
 | `EMAILS_PAUSED` *(optional)* | Cron kill switch — set to `"true"` to halt sends | Set as a Worker var when needed (see `INCIDENT.md`) |
+| `NEXT_PUBLIC_POSTHOG_KEY` *(optional)* | Browser analytics (`lib/analytics.js`) — missing key disables tracking | PostHog → Project settings → Project API key |
+| `NEXT_PUBLIC_POSTHOG_HOST` *(optional)* | PostHog ingest host; defaults to `https://us.i.posthog.com` | PostHog dashboard URL |
 
 > The `NEXT_PUBLIC_*` Supabase values are technically not secret (the anon key is shipped to the browser), but they're still stored as Worker secrets so production config lives in one place rather than being split between `vars` and `secret`. RLS is what protects the Supabase data — see `supabase-schema.sql`.
 
@@ -126,6 +128,20 @@ Per-secret specifics:
 - **`TIP_URL`** *(not a secret, but rotated similarly)* — Edit `wrangler.jsonc` and redeploy.
 
 If you suspect a leak rather than a routine rotation, also: review `wrangler tail` for unauthorized requests over the last 24h, set `EMAILS_PAUSED=true` per `INCIDENT.md` if the leaked secret could send mail, and open an incident issue.
+
+### If you've forgotten the value (`CRON_SECRET` recovery)
+
+Distinct from planned rotation: this is the path you take mid-incident when you need to manually hit `/api/cron` (or `/api/test-email`) and don't have the current `CRON_SECRET` saved anywhere. **Note:** the `/admin` break-glass buttons (#110) are the preferred recovery path and require no secret at all — only fall back to this runbook when `/admin` itself is unavailable. The 2026-05-02 incident (see `INCIDENT.md`) is the worked example; not having the value saved blocked recovery for ~10 min.
+
+1. **Generate** a new value — any password manager, or `openssl rand -hex 32`. Save it somewhere durable *now*, before pasting it anywhere else.
+2. **Replace** in Cloudflare: dashboard → Workers & Pages → `mlb` → Settings → Variables and Secrets → edit `CRON_SECRET` → paste the new value → Save.
+3. **No deploy needed.** Cloudflare hot-swaps the secret on the next request to the worker; you do not need to run `npm run deploy` or touch `wrangler` at all.
+4. **Use it** from any `ninthinning.email` browser tab via DevTools — no terminal required:
+   ```js
+   await fetch('/api/cron', { headers: { Authorization: 'Bearer <new value>' } })
+     .then(r => r.text());
+   ```
+5. **Rotate again afterwards** if the new value got pasted anywhere persistent during recovery (chat transcripts, screenshots, an unencrypted note). Treat the recovery value as burnt and re-run steps 1–3 once the incident is closed.
 
 ## Key Patterns
 
@@ -163,6 +179,18 @@ Implications and known gaps:
 - No Cloudflare WAF rate-limit rules are configured on this account; the per-IP/per-email enforcement lives entirely in the worker bindings above. A WAF rule on `POST /api/login` would be a reasonable belt-and-suspenders addition.
 - The bindings are no-ops in tests and `next dev` (the worker runtime isn't present); enforcement only kicks in after `npm run deploy`. The route handles missing bindings gracefully and falls through to Supabase, so local dev still works.
 
+## Magic-link email template and auth flow
+
+Branded in #55. The Supabase magic-link email used to ship with Supabase's default template (generic body, no product name, raw `noreply@mail.app.supabase.io` sender via implicit Amazon SES routing). It now matches the cron-recap visual language and resolves a flow mismatch that was breaking sign-in entirely.
+
+Three pieces, two of them dashboard-only:
+
+- **Sender** — covered by #97's custom-SMTP work above. `Ninth Inning Email <highlights@ninthinning.email>` with SPF/DKIM/DMARC passing, no "via" suffix in Gmail.
+- **Template** — HTML lives in `supabase/email-templates/magic-link.html` (paste-into-dashboard source of truth, not loaded at runtime). Visually mirrors `lib/email-template.js`: 520px single-column card, 6px ballpark-green accent bar, prominent CTA button using `{{ .ConfirmationURL }}` (Supabase's substitution token — do not change), footer wordmark, and the same non-affiliation disclaimer the cron emails carry. Subject is `Your Ninth Inning Email login link`. Both subject and the first body line name the product so a recipient knows the source without clicking.
+- **Auth flow (PKCE, not implicit)** — `/api/login` calls `createClient` from `@/lib/supabase-server` (the `@supabase/ssr` server client) rather than the raw `@supabase/supabase-js` client. The raw client defaults to the implicit OAuth flow, which returns tokens in the URL hash (`#access_token=...`); the SSR client defaults to PKCE, which redirects with `?code=...` query params that our `app/auth/callback/route.js` exchanges for a session via `exchangeCodeForSession`. Mixing them silently breaks sign-in: the verify step succeeds and the user lands on the redirect URL, but the hash never reaches the server callback so no session cookie is set and the user is bounced back to `/login`. This is exactly how #55 first failed in production. Keep `/api/login` on the SSR client.
+
+`emailRedirectTo` prefers `process.env.SITE_URL` and falls back to the request origin, so a misrouted request (e.g. hitting the worker on a `*.workers.dev` URL) can't ship a bad redirect. Note that Supabase only honors `emailRedirectTo` if the URL is on the **Auth → URL Configuration → Redirect URLs** allowlist; an un-allowlisted URL silently falls back to **Site URL**, which is what produced the original "lands on `/login`" symptom in #55. Required allowlist entries: `https://ninthinning.email/auth/callback` and `https://ninthinning.email/dashboard`.
+
 ## Cron architecture
 
 Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endpoints by `event.cron` in `scripts/inject-scheduled.mjs` (closes #76):
@@ -182,6 +210,19 @@ Failure modes worth knowing:
 - **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
 
 `mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
+
+## Break-glass recovery (#110)
+
+When you need to manually kick the cron — e.g. the daily scheduler missed a tick, or a *every-15-min run silently early-returned during a deploy window — the primary recovery path is the **/admin** page, not curl + bearer token.
+
+Two buttons on `/admin`:
+
+- **Run daily scheduler now** — invokes the same code path as `GET /api/cron/schedule` (populates `mlb_cron_schedule` for today).
+- **Run main cron now** — invokes the same code path as `GET /api/cron` (checks for completed games and sends emails).
+
+Both run as Next.js Server Actions. Auth is the existing admin session check: the action calls `assertAdmin()` server-side (re-checks `auth.getUser()` and `ADMIN_EMAIL`) before doing any work — `notFound()` on the page hides the buttons but is **not** the security boundary. No `CRON_SECRET` is required, since auth is via the user session, not a bearer token. The shared cron logic lives in `lib/cron-jobs.js` (`runMainCron` and `runScheduler`); both the route handlers and the server actions call into it.
+
+Recovery time goes from ~10 min (rotate `CRON_SECRET`, then DevTools fetch) to ~30 sec (open `/admin`, click button). The 2026-05-02 incident in `INCIDENT.md` is the canonical example of why this matters: not having `CRON_SECRET` saved blocked recovery for the first ~10 min.
 
 ## Out-of-band SLO alarms (#107)
 
@@ -254,6 +295,30 @@ select public.mlb_check_slo_alarms();
 ```
 
 In production, the natural test is to `cron.unschedule('main')` for the every-15-min cron in Cloudflare for >30 min during the season and confirm B2 fires within 5 min.
+
+## Product analytics (#94)
+
+Browser-side event tracking via PostHog. The wrapper in `lib/analytics.js` is a no-op when `NEXT_PUBLIC_POSTHOG_KEY` is unset, so dev/test/preview environments don't ship telemetry. Initialization and user identification happen in `app/posthog-provider.js`, mounted from the root layout — `app/layout.js` calls `supabase.auth.getUser()` so PostHog can `identify()` (or `reset()`) on every render.
+
+Events currently captured:
+
+| Event | Fired from | Notes |
+|-------|------------|-------|
+| `signup_completed` | `app/dashboard/signup-tracker.js` | The auth callback (`app/auth/callback/route.js`) appends `?signup=1` when `auth.users.created_at` is < 5 min old; the dashboard tracker fires once and strips the param via `router.replace` so a refresh doesn't double-count |
+| `team_selected` / `team_deselected` | `app/dashboard/team-grid.js` | Includes `team_id` in props; fired after the Supabase write resolves |
+| `unsubscribe_clicked` | `app/unsubscribe/page.js` | Anonymous (no user session), but PostHog distinct_id persists across visits |
+
+Autocapture and session recording are disabled — only the explicit events above. Pageviews and pageleaves are captured automatically by PostHog. To add a new event, import `track` from `@/lib/analytics` and call it from a `"use client"` component.
+
+## Welcome email (#26)
+
+A one-time welcome email fires the first time a user adds a team in `/dashboard`. The trigger lives client-side in `app/dashboard/team-grid.js` — after a successful insert into `mlb_user_teams`, it fires-and-forgets a POST to `/api/welcome`.
+
+`POST /api/welcome` (`app/api/welcome/route.js`) authenticates via the Supabase session (no `CRON_SECRET` required), confirms the user has at least one team, and delegates to `sendWelcomeEmailIfNeeded` in `lib/welcome-email.js`.
+
+Idempotency uses a sentinel row in `mlb_sent_notifications` with `game_pk = 0` (no schema change). The helper does claim-then-send: insert the sentinel first, then send. If the insert fails with Postgres `23505` (unique violation), a previous call already won and we skip. If `sendEmail` throws, the sentinel is rolled back so a retry can succeed. This makes "remove all teams, re-add" a no-op — the sentinel persists.
+
+The email template is `buildWelcomeEmailHtml` in `lib/email-template.js`. Same 520px card layout as the recap email but with a brand-green accent (no team color, since there's no team), three "how it works" bullets, and a CTA back to `/dashboard`.
 
 ## Supabase schema conventions
 

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -56,12 +56,9 @@ export async function POST(request) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = await createClient();
 
-  const origin = new URL(request.url).origin;
+  const origin = process.env.SITE_URL || new URL(request.url).origin;
 
   const { error } = await supabase.auth.signInWithOtp({
     email,

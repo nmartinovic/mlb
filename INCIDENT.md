@@ -6,6 +6,12 @@
 
 All DMCA notices, MLB rights inquiries, and takedown requests go here. Set up this address as a forwarding alias in your domain's email settings before launch.
 
+## Break-glass: manually kick the cron
+
+Primary path (per #110): open `/admin` while signed in as `ADMIN_EMAIL` and click **Run daily scheduler now** or **Run main cron now**. Both run server-side under the existing admin session check — no `CRON_SECRET` needed. The response renders inline so you can confirm what happened (e.g. *"Scheduled 15 wakes for 2026-05-02"* or *"Processed 1 games, sent 1 emails"*).
+
+This replaces the old recovery procedure (rotate `CRON_SECRET` → DevTools fetch with bearer header), which on 2026-05-02 wasted ~10 min at the start of an incident because the secret wasn't saved anywhere. If `/admin` itself is broken (e.g. Supabase auth is down), fall back to bearer-token curl against `/api/cron/schedule` and `/api/cron`.
+
 ## Kill switch
 
 To pause all outbound email sends immediately — no code deploy needed:
@@ -42,3 +48,4 @@ MLB DMCA agent contact: https://www.mlb.com/official-information/terms-of-use
 
 - 2026-04-30 — Routine `CRON_SECRET` rotation dry-run (per #56 acceptance criteria). No incident.
 - 2026-05-02 — Missed Mariners recap email (game_pk 823144). `mlb_cron_schedule` was empty because the daily 9am-ET scheduler had never run: the `0 13 * * *` trigger added in #76 only registered with Cloudflare on the deploy that landed ~04:00 UTC today, and the every-15-min cron silently early-returned for ~5h until manual intervention. Recovered by curling `/api/cron/schedule` to populate today's slate, then inserting a synthetic wake-in-window for 823144 and triggering `/api/cron`. `CRON_SECRET` rotated twice during recovery (forgotten value → temporary value → fresh value, since the temporary was pasted in a chat transcript). Followups: alarm on missing `schedule_built` row in any 26h window so this doesn't go undetected again; verify the next 13:00 UTC scheduler tick fires automatically.
+- 2026-05-04 — Disclosure decision for the `mlb_users` view email-enumeration exposure patched in PR #80 (issue #82). **No notification sent, no public note posted.** Rationale: the only signed-up user during the affected window was the project owner, so there is no third party to disclose to. Decision recorded here for posterity per the issue's acceptance criteria; closing #82 with no further action.
