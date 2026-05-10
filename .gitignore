@@ -17,3 +17,6 @@ node_modules/
 *.pem
 *.p12
 *.pfx
+
+# Product-demo build artifacts (issue #127)
+scripts/demo/out/
