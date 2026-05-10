@@ -55,10 +55,10 @@ export default function TeamGrid({ teams, followedIds: initialFollowed }) {
             onClick={() => toggle(team.id)}
             aria-pressed={isActive}
             aria-label={`${isActive ? "Unfollow" : "Follow"} ${team.name}`}
-            className={`group relative flex min-h-[64px] w-full flex-col justify-center overflow-hidden rounded-xl border px-4 py-3 text-left text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1410] ${
+            className={`group relative flex min-h-[64px] w-full flex-col justify-center overflow-hidden rounded-xl border px-4 py-3 text-left text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1311] ${
               isActive
-                ? "border-transparent text-[#f5f1e6] shadow-lg shadow-black/30"
-                : "border-[#1f3a2c] bg-[#0f2a1f]/40 text-[#a8a299] hover:border-[#3f6e57] hover:bg-[#0f2a1f]/60 hover:text-[#f5f1e6]"
+                ? "border-transparent text-[#f7f5ef] shadow-lg shadow-black/30"
+                : "border-[#1f3a2c] bg-[#0f2a1f]/40 text-[#a8a299] hover:border-[#4a7a5b] hover:bg-[#0f2a1f]/60 hover:text-[#f7f5ef]"
             }`}
             style={
               isActive

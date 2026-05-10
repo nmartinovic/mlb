@@ -5,6 +5,30 @@ export const alt =
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Inline SVG glyph (diamond / four bases) per brand sheet v1.0.
+function GlyphSvg({ size: s = 140 }) {
+  return (
+    <svg width={s} height={s} viewBox="0 0 100 100" style={{ display: "block" }}>
+      <rect width="100" height="100" rx="22" fill="#2d5a3d" />
+      <rect
+        x="50"
+        y="14"
+        width="50.91"
+        height="50.91"
+        transform="rotate(45 50 14)"
+        fill="none"
+        stroke="#f7f5ef"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
+      <circle cx="50" cy="86" r="4.5" fill="#b8312f" />
+      <circle cx="14" cy="50" r="3.2" fill="#f7f5ef" />
+      <circle cx="86" cy="50" r="3.2" fill="#f7f5ef" />
+      <circle cx="50" cy="14" r="3.2" fill="#f7f5ef" />
+    </svg>
+  );
+}
+
 export default async function OpengraphImage() {
   return new ImageResponse(
     (
@@ -18,8 +42,8 @@ export default async function OpengraphImage() {
           alignItems: "flex-start",
           padding: "80px",
           background:
-            "radial-gradient(ellipse 80% 60% at 30% 0%, #0f5132 0%, #0a1410 60%)",
-          color: "#f5f1e6",
+            "radial-gradient(ellipse 80% 60% at 30% 0%, #2d5a3d 0%, #0f1311 60%)",
+          color: "#f7f5ef",
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
       >
@@ -27,49 +51,37 @@ export default async function OpengraphImage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "16px",
-            fontSize: "28px",
-            fontWeight: 600,
-            color: "#a8a299",
-            letterSpacing: "0.02em",
+            gap: "24px",
+            fontSize: "32px",
+            fontWeight: 500,
+            color: "#f7f5ef",
+            letterSpacing: "-0.015em",
           }}
         >
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div
+          <GlyphSvg size={88} />
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span>ninthinning</span>
+            <span
               style={{
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                background: "#c41e3a",
+                display: "block",
+                width: 14,
+                height: 14,
+                background: "#7fb295",
+                transform: "rotate(45deg)",
+                margin: "0 14px",
               }}
             />
-            <div
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                background: "#f5f1e6",
-              }}
-            />
-            <div
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                background: "#c41e3a",
-              }}
-            />
+            <span>email</span>
           </div>
-          <span>Ninth Inning Email</span>
         </div>
         <div
           style={{
-            marginTop: "40px",
+            marginTop: "48px",
             fontSize: "84px",
-            fontWeight: 800,
+            fontWeight: 700,
             lineHeight: 1.05,
             letterSpacing: "-0.03em",
-            color: "#f5f1e6",
+            color: "#f7f5ef",
             maxWidth: "1000px",
           }}
         >

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TEAMS_BY_ID } from "@/lib/teams";
 import { createClient } from "@/lib/supabase-server";
+import { BrandLockup, DiamondGlyph } from "@/components/brand";
 
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
@@ -31,12 +32,8 @@ function EmailPreview({ size = "sm", showInboxRow = false }) {
       {showInboxRow && (
         <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
           <div className="flex items-start gap-3 px-4 py-3">
-            <div
-              className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-              style={{ backgroundColor: team.color }}
-              aria-hidden="true"
-            >
-              {team.abbr}
+            <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg">
+              <DiamondGlyph size={32} title="ninthinning.email" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
@@ -105,10 +102,10 @@ function EmailPreview({ size = "sm", showInboxRow = false }) {
 function StepCard({ n, title, body }) {
   return (
     <div className="rounded-2xl border border-[#1f3a2c] bg-[#0f2a1f]/40 p-6">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#2d5240] text-sm font-semibold text-[#f5f1e6]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3f6e57] text-sm font-semibold text-[#f7f5ef]">
         {n}
       </div>
-      <h3 className="mt-4 text-base font-semibold text-[#f5f1e6]">{title}</h3>
+      <h3 className="mt-4 text-base font-semibold text-[#f7f5ef]">{title}</h3>
       <p className="mt-2 text-sm text-[#a8a299]">{body}</p>
     </div>
   );
@@ -117,7 +114,7 @@ function StepCard({ n, title, body }) {
 function Stat({ value, label }) {
   return (
     <div className="text-center sm:text-left">
-      <div className="text-3xl font-bold text-[#f5f1e6] sm:text-4xl">
+      <div className="text-3xl font-bold text-[#f7f5ef] sm:text-4xl">
         {value}
       </div>
       <div className="mt-1 text-sm text-[#a8a299]">{label}</div>
@@ -128,7 +125,7 @@ function Stat({ value, label }) {
 function FaqItem({ q, children }) {
   return (
     <details className="group rounded-xl border border-[#1f3a2c] bg-[#0f2a1f]/40 px-5 py-4 open:bg-[#0f2a1f]/60">
-      <summary className="flex cursor-pointer items-center justify-between text-sm font-medium text-[#f5f1e6] list-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer items-center justify-between text-sm font-medium text-[#f7f5ef] list-none [&::-webkit-details-marker]:hidden">
         <span>{q}</span>
         <span className="ml-4 text-[#a8a299] transition-transform group-open:rotate-45">
           +
@@ -155,12 +152,12 @@ export default async function Home() {
     <div className="min-h-screen">
       {/* Top bar */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <span className="text-sm font-semibold tracking-tight text-[#f5f1e6]">
-          Ninth Inning Email
-        </span>
+        <Link href="/" aria-label="ninthinning.email" className="text-[15px] text-[#f7f5ef]">
+          <BrandLockup glyphSize={28} dark />
+        </Link>
         <Link
           href={isSignedIn ? "/dashboard" : "/login"}
-          className="text-sm font-medium text-[#a8a299] hover:text-[#f5f1e6] transition"
+          className="text-sm font-medium text-[#a8a299] hover:text-[#f7f5ef] transition"
         >
           {isSignedIn ? "Dashboard" : "Sign in"}
         </Link>
@@ -182,7 +179,7 @@ export default async function Home() {
               <span className="inline-block rounded-full border border-[#1f3a2c] bg-[#0f2a1f]/60 px-3 py-1 text-xs font-medium text-[#a8a299]">
                 Free · For MLB fans
               </span>
-              <h1 className="mt-5 text-4xl font-bold tracking-tight text-[#f5f1e6] sm:text-5xl lg:text-6xl">
+              <h1 className="mt-5 text-4xl font-bold tracking-tight text-[#f7f5ef] sm:text-5xl lg:text-6xl">
                 Spoiler-free MLB recaps in your inbox.
               </h1>
               <p className="mt-5 text-lg text-[#a8a299] sm:text-xl">
@@ -192,13 +189,13 @@ export default async function Home() {
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
                   href={ctaHref}
-                  className="w-full rounded-lg bg-[#c41e3a] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#d92645] transition sm:w-auto"
+                  className="w-full rounded-lg bg-[#b8312f] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#a02825] transition sm:w-auto"
                 >
                   {ctaLabel}
                 </Link>
                 <a
                   href="#sample"
-                  className="text-sm font-medium text-[#a8a299] hover:text-[#f5f1e6] transition"
+                  className="text-sm font-medium text-[#a8a299] hover:text-[#f7f5ef] transition"
                 >
                   See a sample email &rarr;
                 </a>
@@ -215,7 +212,7 @@ export default async function Home() {
       </section>
 
       {/* Stat strip */}
-      <section className="border-y border-[#1f3a2c] bg-[#0a1410]/60">
+      <section className="border-y border-[#1f3a2c] bg-[#0f1311]/60">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-10 sm:grid-cols-3">
           <Stat value="30" label="MLB teams supported" />
           <Stat value="Zero" label="Spoilers, ever" />
@@ -226,7 +223,7 @@ export default async function Home() {
       {/* How it works */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+          <h2 className="text-3xl font-bold tracking-tight text-[#f7f5ef] sm:text-4xl">
             How it works
           </h2>
           <p className="mt-3 text-[#a8a299]">
@@ -253,10 +250,10 @@ export default async function Home() {
       </section>
 
       {/* Sample email */}
-      <section id="sample" className="border-t border-[#1f3a2c] bg-[#0a1410]/60">
+      <section id="sample" className="border-t border-[#1f3a2c] bg-[#0f1311]/60">
         <div className="mx-auto max-w-4xl px-6 py-20">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+            <h2 className="text-3xl font-bold tracking-tight text-[#f7f5ef] sm:text-4xl">
               Here's what lands in your inbox
             </h2>
             <p className="mt-3 text-[#a8a299]">
@@ -271,7 +268,7 @@ export default async function Home() {
 
       {/* Built by a fan */}
       <section className="mx-auto max-w-3xl px-6 py-20 text-center">
-        <h2 className="text-2xl font-bold tracking-tight text-[#f5f1e6] sm:text-3xl">
+        <h2 className="text-2xl font-bold tracking-tight text-[#f7f5ef] sm:text-3xl">
           Built by a fan, for fans
         </h2>
         <p className="mt-5 text-[#a8a299]">
@@ -286,7 +283,7 @@ export default async function Home() {
               href={tipUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block rounded-lg border border-[#2d5240] px-5 py-2 font-semibold text-[#f5f1e6] hover:border-[#c41e3a] hover:text-[#c41e3a] transition"
+              className="inline-block rounded-lg border border-[#3f6e57] px-5 py-2 font-semibold text-[#f7f5ef] hover:border-[#b8312f] hover:text-[#b8312f] transition"
             >
               Tip the developer
             </a>
@@ -296,7 +293,7 @@ export default async function Home() {
 
       {/* FAQ */}
       <section className="mx-auto max-w-3xl px-6 pb-20">
-        <h2 className="text-center text-2xl font-bold tracking-tight text-[#f5f1e6] sm:text-3xl">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-[#f7f5ef] sm:text-3xl">
           Questions
         </h2>
         <div className="mt-8 space-y-3">
@@ -338,7 +335,7 @@ export default async function Home() {
             Just your email address, the teams you follow, and a log of
             which recaps we&apos;ve sent you. No tracking, no ads, no name.
             See the{" "}
-            <Link href="/privacy" className="underline hover:text-[#f5f1e6] transition">
+            <Link href="/privacy" className="underline hover:text-[#f7f5ef] transition">
               privacy page
             </Link>{" "}
             for the full list.
@@ -347,7 +344,7 @@ export default async function Home() {
             Email{" "}
             <a
               href="mailto:highlights@ninthinning.email?subject=Delete%20my%20account"
-              className="underline hover:text-[#f5f1e6] transition"
+              className="underline hover:text-[#f7f5ef] transition"
             >
               highlights@ninthinning.email
             </a>{" "}
@@ -359,8 +356,8 @@ export default async function Home() {
 
       {/* Final CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="rounded-3xl border border-[#1f3a2c] bg-gradient-to-br from-[#0f5132]/20 to-[#0f2a1f]/40 px-6 py-14 text-center sm:px-12">
-          <h2 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+        <div className="rounded-3xl border border-[#1f3a2c] bg-gradient-to-br from-[#2d5a3d]/20 to-[#0f2a1f]/40 px-6 py-14 text-center sm:px-12">
+          <h2 className="text-3xl font-bold tracking-tight text-[#f7f5ef] sm:text-4xl">
             Ready for spoiler-free recaps?
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-[#a8a299]">
@@ -370,7 +367,7 @@ export default async function Home() {
           <div className="mt-8 flex justify-center">
             <Link
               href={ctaHref}
-              className="rounded-lg bg-[#c41e3a] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#d92645] transition"
+              className="rounded-lg bg-[#b8312f] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#a02825] transition"
             >
               {ctaLabel}
             </Link>
@@ -388,11 +385,11 @@ export default async function Home() {
           <div className="flex items-center gap-5">
             <Link
               href={isSignedIn ? "/dashboard" : "/login"}
-              className="hover:text-[#f5f1e6] transition"
+              className="hover:text-[#f7f5ef] transition"
             >
               {isSignedIn ? "Dashboard" : "Sign in"}
             </Link>
-            <Link href="/privacy" className="hover:text-[#f5f1e6] transition">
+            <Link href="/privacy" className="hover:text-[#f7f5ef] transition">
               Privacy
             </Link>
           </div>
