@@ -36,7 +36,20 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#0a1410] text-[#f5f1e6] antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap"
+        />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f%5B%5D=general-sans@400,500,600,700&display=swap"
+        />
+      </head>
+      <body className="min-h-screen bg-[#0f1311] text-[#f7f5ef] antialiased">
         <PostHogProvider userId={user?.id ?? null} userEmail={user?.email ?? null} />
         {children}
       </body>

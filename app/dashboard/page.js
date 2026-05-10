@@ -6,6 +6,7 @@ import TeamGrid from "./team-grid";
 import SignupTracker from "./signup-tracker";
 import { Suspense } from "react";
 import pkg from "../../package.json";
+import { BrandLockup } from "@/components/brand";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -29,14 +30,15 @@ export default async function DashboardPage() {
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
         <Link
           href="/"
-          className="text-sm font-semibold tracking-tight text-[#f5f1e6] transition hover:text-white"
+          aria-label="ninthinning.email"
+          className="text-[15px] text-[#f7f5ef] transition hover:opacity-90"
         >
-          Ninth Inning Email
+          <BrandLockup glyphSize={28} dark />
         </Link>
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="text-sm font-medium text-[#a8a299] transition hover:text-[#f5f1e6]"
+            className="text-sm font-medium text-[#a8a299] transition hover:text-[#f7f5ef]"
           >
             Sign out
           </button>
@@ -58,7 +60,7 @@ export default async function DashboardPage() {
               <SignupTracker />
             </Suspense>
 
-            <h1 className="text-3xl font-bold tracking-tight text-[#f5f1e6] sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-[#f7f5ef] sm:text-4xl">
               Your teams
             </h1>
             <p className="mt-2 text-[#a8a299]">
@@ -69,7 +71,7 @@ export default async function DashboardPage() {
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
               <span className="text-[#a8a299]/80">
                 Signed in as{" "}
-                <span className="text-[#f5f1e6]">{user.email}</span>
+                <span className="text-[#f7f5ef]">{user.email}</span>
               </span>
               <span className="rounded-full border border-[#1f3a2c] bg-[#0f2a1f]/60 px-2.5 py-1 font-medium text-[#a8a299]">
                 {followedCount === 0
@@ -78,7 +80,7 @@ export default async function DashboardPage() {
               </span>
               <Link
                 href="/dashboard/highlights"
-                className="font-medium text-[#a8a299] underline-offset-4 transition hover:text-[#f5f1e6] hover:underline"
+                className="font-medium text-[#a8a299] underline-offset-4 transition hover:text-[#f7f5ef] hover:underline"
               >
                 View recent highlights →
               </Link>
@@ -101,14 +103,14 @@ export default async function DashboardPage() {
                 href={tipUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="transition hover:text-[#f5f1e6]"
+                className="transition hover:text-[#f7f5ef]"
               >
                 Tip the developer
               </a>
             )}
             <Link
               href="/unsubscribe"
-              className="transition hover:text-[#f5f1e6]"
+              className="transition hover:text-[#f7f5ef]"
             >
               Unsubscribe
             </Link>

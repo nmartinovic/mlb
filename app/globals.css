@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+/* Brand tokens — see "Ninth Inning Brand Sheet" v1.0 (diamond / four bases). */
+:root {
+  --brand-green: #2d5a3d;
+  --brand-green-soft: #4a7a5b;
+  --brand-green-light: #7fb295;
+  --brand-stitch: #b8312f;
+  --brand-ink: #1a1d1c;
+  --brand-paper: #f7f5ef;
+  --brand-night: #0f1311;
+  --brand-night-2: #161b18;
+  --font-display: "General Sans", "Hanken Grotesk", system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+}
