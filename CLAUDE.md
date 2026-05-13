@@ -215,12 +215,13 @@ Failure modes worth knowing:
 
 When you need to manually kick the cron — e.g. the daily scheduler missed a tick, or a *every-15-min run silently early-returned during a deploy window — the primary recovery path is the **/admin** page, not curl + bearer token.
 
-Two buttons on `/admin`:
+Three buttons on `/admin`:
 
 - **Run daily scheduler now** — invokes the same code path as `GET /api/cron/schedule` (populates `mlb_cron_schedule` for today).
 - **Run main cron now** — invokes the same code path as `GET /api/cron` (checks for completed games and sends emails).
+- **Resend latest recap to me** (#150) — re-renders the admin's most recent recap with the current `buildEmailHtml` and sends it back to `ADMIN_EMAIL` with a `[TEST]` subject prefix. Uses `lib/resend-recap.js`, which prefers the latest `mlb_sent_notifications` row for the admin (excluding the welcome sentinel `game_pk = 0`) and falls back to the most recent `mlb_game_cache` row with a `highlight_url`. Standings are re-fetched the same way `runMainCron` does so template changes that depend on `extractTeamStanding` are exercised. Does **not** write to `mlb_sent_notifications` (so it won't block future real sends or pollute analytics) and respects `EMAILS_PAUSED`.
 
-Both run as Next.js Server Actions. Auth is the existing admin session check: the action calls `assertAdmin()` server-side (re-checks `auth.getUser()` and `ADMIN_EMAIL`) before doing any work — `notFound()` on the page hides the buttons but is **not** the security boundary. No `CRON_SECRET` is required, since auth is via the user session, not a bearer token. The shared cron logic lives in `lib/cron-jobs.js` (`runMainCron` and `runScheduler`); both the route handlers and the server actions call into it.
+All run as Next.js Server Actions. Auth is the existing admin session check: the action calls `assertAdmin()` server-side (re-checks `auth.getUser()` and `ADMIN_EMAIL`) before doing any work — `notFound()` on the page hides the buttons but is **not** the security boundary. No `CRON_SECRET` is required, since auth is via the user session, not a bearer token. The shared cron logic lives in `lib/cron-jobs.js` (`runMainCron` and `runScheduler`); both the route handlers and the server actions call into it.
 
 Recovery time goes from ~10 min (rotate `CRON_SECRET`, then DevTools fetch) to ~30 sec (open `/admin`, click button). The 2026-05-02 incident in `INCIDENT.md` is the canonical example of why this matters: not having `CRON_SECRET` saved blocked recovery for the first ~10 min.
 
