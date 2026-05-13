@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { runSchedulerAction, runMainCronAction } from "./actions";
+import {
+  runSchedulerAction,
+  runMainCronAction,
+  resendLatestRecapAction,
+} from "./actions";
 
 const INITIAL = { ok: null, message: null, errors: null, ranAt: null };
 
@@ -21,6 +25,10 @@ export default function BreakGlass() {
         <BreakGlassButton
           label="Run main cron now"
           action={runMainCronAction}
+        />
+        <BreakGlassButton
+          label="Resend latest recap to me"
+          action={resendLatestRecapAction}
         />
       </div>
     </div>
