@@ -118,6 +118,33 @@ describe("inject-scheduled", () => {
     expect(scheduledBlock).not.toContain("Object.entries(env)");
   });
 
+  it("validates required env bindings and names them + the dashboard path (#165)", () => {
+    runInject();
+    const patched = readFileSync(workerPath, "utf-8");
+    const scheduledIdx = patched.indexOf("async scheduled");
+    const scheduledBlock = patched.slice(
+      scheduledIdx,
+      patched.indexOf("async fetch", scheduledIdx)
+    );
+    // Both required secrets must appear in the validation list so missing
+    // either of them produces a named, actionable wrangler-tail message
+    // instead of "supabaseUrl is required" from deep inside @supabase/*.
+    expect(scheduledBlock).toContain('"NEXT_PUBLIC_SUPABASE_URL"');
+    expect(scheduledBlock).toContain('"SUPABASE_SERVICE_ROLE_KEY"');
+    // The skip message must name the missing binding(s) and point to the
+    // dashboard path the operator needs to open to fix it.
+    expect(scheduledBlock).toMatch(/missing Worker secret/);
+    expect(scheduledBlock).toContain(
+      "Cloudflare dashboard → Workers → mlb → Settings → Variables and Secrets"
+    );
+    // Validation must happen before the createAdminClient call — otherwise
+    // the Supabase constructor's own error wins and the named message never
+    // reaches wrangler tail.
+    expect(scheduledBlock.indexOf("missing Worker secret")).toBeLessThan(
+      scheduledBlock.indexOf("createAdminClient")
+    );
+  });
+
   it("is idempotent — running it twice does not double-inject", () => {
     runInject();
     const once = readFileSync(workerPath, "utf-8");

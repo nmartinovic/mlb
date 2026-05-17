@@ -82,6 +82,19 @@ const scheduledHandler = `
         // injected handler (#163). Threading env to each lib is uglier but it
         // actually works.
         const job = event.cron === "0 13 * * *" ? "schedule" : "main";
+        // Fail fast on missing Worker secrets — otherwise the failure surfaces
+        // as "supabaseUrl is required" deep inside the Supabase client, the
+        // try/catch below logs a generic stack, Cloudflare counts the tick as
+        // outcome:ok, and the only signal is SLO B1 firing 26h later (#165).
+        const requiredBindings = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+        const missingBindings = requiredBindings.filter((k) => !env[k]);
+        if (missingBindings.length) {
+            console.error(
+                \`Cron \${job} skipped: missing Worker secret(s): \${missingBindings.join(", ")}. \` +
+                "Set via Cloudflare dashboard → Workers → mlb → Settings → Variables and Secrets."
+            );
+            return;
+        }
         const work = (async () => {
             try {
                 const supabase = cron.createAdminClient(
