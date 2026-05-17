@@ -57,6 +57,29 @@ export async function runMainCronAction(_prevState, _formData) {
   };
 }
 
+// Catch-up path (#154): bypasses the wake-window gate and forces a full
+// check + send. Use when an earlier tick was killed mid-run and missed
+// emails — `mlb_sent_notifications` dedupes, so already-sent users are skipped.
+export async function forceRunMainCronAction(_prevState, _formData) {
+  const auth = await assertAdmin();
+  if (!auth.ok) {
+    return { ok: false, message: auth.error, ranAt: new Date().toISOString() };
+  }
+
+  const supabase = createAdminClient();
+  const { status, body } = await runMainCron({
+    supabase,
+    emailsPaused: process.env.EMAILS_PAUSED === "true",
+    force: true,
+  });
+  return {
+    ok: status < 400,
+    message: body.message || body.error || "ran",
+    errors: body.errors,
+    ranAt: new Date().toISOString(),
+  };
+}
+
 export async function resendLatestRecapAction(_prevState, _formData) {
   const ranAt = new Date().toISOString();
   const auth = await assertAdmin();

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import {
   runSchedulerAction,
   runMainCronAction,
+  forceRunMainCronAction,
   resendLatestRecapAction,
 } from "./actions";
 
@@ -25,6 +26,10 @@ export default function BreakGlass() {
         <BreakGlassButton
           label="Run main cron now"
           action={runMainCronAction}
+        />
+        <BreakGlassButton
+          label="Force run main cron (catch up missed)"
+          action={forceRunMainCronAction}
         />
         <BreakGlassButton
           label="Resend latest recap to me"
