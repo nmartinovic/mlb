@@ -20,6 +20,14 @@ const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const WORKER_NAME = "mlb";
 const EXPECTED_CRONS = ["*/15 * * * *", "0 13 * * *"];
 
+// Per-call timeouts (#159). Unbounded fetch() lets a hung endpoint wedge the
+// deploy script indefinitely. The bootstrap call wraps a Worker request that
+// itself hits MLB + Supabase, so its budget is wider than the Cloudflare/MLB
+// probes that follow.
+const BOOTSTRAP_TIMEOUT_MS = 30000;
+const CF_API_TIMEOUT_MS = 10000;
+const MLB_API_TIMEOUT_MS = 8000;
+
 function fail(msg) {
   console.error(`\npost-deploy: FAIL — ${msg}`);
   process.exit(1);
@@ -51,6 +59,7 @@ let bootstrapResp;
 try {
   bootstrapResp = await fetch(`${SITE_URL}/api/cron/schedule`, {
     headers: { Authorization: `Bearer ${CRON_SECRET}` },
+    signal: AbortSignal.timeout(BOOTSTRAP_TIMEOUT_MS),
   });
 } catch (err) {
   fail(`network error calling /api/cron/schedule: ${err.message}`);
@@ -84,7 +93,10 @@ if (CF_API_TOKEN && CF_ACCOUNT_ID) {
   const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/schedules`;
   let cfResp;
   try {
-    cfResp = await fetch(url, { headers: { Authorization: `Bearer ${CF_API_TOKEN}` } });
+    cfResp = await fetch(url, {
+      headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
+      signal: AbortSignal.timeout(CF_API_TIMEOUT_MS),
+    });
   } catch (err) {
     fail(`network error calling Cloudflare schedules API: ${err.message}`);
   }
@@ -120,7 +132,10 @@ if (wakeCount > 0) {
   // hide behind a "must be offseason" assumption.
   let mlbHasGames = null;
   try {
-    const mlbResp = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}`);
+    const mlbResp = await fetch(
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}`,
+      { signal: AbortSignal.timeout(MLB_API_TIMEOUT_MS) },
+    );
     if (mlbResp.ok) {
       const data = await mlbResp.json();
       mlbHasGames = (data?.dates?.[0]?.games || []).length > 0;
