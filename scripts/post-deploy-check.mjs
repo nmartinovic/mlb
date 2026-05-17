@@ -1,4 +1,4 @@
-// Post-deploy bootstrap + smoke checks. Issue #108.
+// Post-deploy bootstrap + smoke checks. Issue #108, extended in #166.
 //
 // Cloudflare cron triggers fire on schedule, not on registration. A deploy
 // landing after 13:00 UTC creates a window of up to 24h where the daily
@@ -8,10 +8,21 @@
 //   1. POSTing once to /api/cron/schedule so the table is populated immediately.
 //   2. Verifying both expected cron triggers are registered with Cloudflare.
 //   3. Asserting today's schedule has rows when MLB has games today.
+//   4. Cross-checking runtime Worker secrets against CLAUDE.md's canonical list
+//      (#166) — postmortem #164 landed because two NEXT_PUBLIC_SUPABASE_*
+//      values were only in the Build store, not the runtime store.
 //
 // Required env: CRON_SECRET.
 // Optional env: CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID (enables the
-// Cloudflare-side trigger check; without them the script warns and continues).
+// Cloudflare-side trigger + secret checks; without them the script warns and
+// continues).
+
+import { execFileSync } from "node:child_process";
+import {
+  REQUIRED_SECRETS,
+  parseWranglerSecretList,
+  verifySecrets,
+} from "./verify-secrets.mjs";
 
 const SITE_URL = process.env.SITE_URL || "https://ninthinning.email";
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -27,6 +38,7 @@ const EXPECTED_CRONS = ["*/15 * * * *", "0 13 * * *"];
 const BOOTSTRAP_TIMEOUT_MS = 30000;
 const CF_API_TIMEOUT_MS = 10000;
 const MLB_API_TIMEOUT_MS = 8000;
+const WRANGLER_SECRET_LIST_TIMEOUT_MS = 15000;
 
 function fail(msg) {
   console.error(`\npost-deploy: FAIL — ${msg}`);
@@ -121,7 +133,62 @@ if (CF_API_TOKEN && CF_ACCOUNT_ID) {
 }
 
 // ---------------------------------------------------------------------------
-// 3) Assert today's row presence (skip on offseason)
+// 3) Verify runtime Worker secrets match CLAUDE.md (#166)
+// ---------------------------------------------------------------------------
+
+if (CF_API_TOKEN && CF_ACCOUNT_ID) {
+  info("verifying runtime Worker secrets via `wrangler secret list` …");
+  let stdout;
+  try {
+    stdout = execFileSync(
+      "npx",
+      ["wrangler", "secret", "list", "--name", WORKER_NAME, "--format", "json"],
+      {
+        encoding: "utf-8",
+        timeout: WRANGLER_SECRET_LIST_TIMEOUT_MS,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env },
+      },
+    );
+  } catch (err) {
+    fail(
+      `could not list Worker secrets via wrangler: ${err.message}. ` +
+        `Ensure CLOUDFLARE_API_TOKEN has the "Workers Scripts:Edit" permission.`,
+    );
+  }
+
+  let actualNames;
+  try {
+    actualNames = parseWranglerSecretList(stdout);
+  } catch (err) {
+    fail(`could not parse \`wrangler secret list\` output: ${err.message}`);
+  }
+
+  const { missing, extra } = verifySecrets(actualNames);
+  if (missing.length > 0) {
+    fail(
+      `Worker is missing required secret(s): ${missing.join(", ")}. ` +
+        `Set them with \`npx wrangler secret put <NAME>\` and redeploy. ` +
+        `Full rotation runbook: CLAUDE.md → "Secret rotation runbook".`,
+    );
+  }
+  if (extra.length > 0) {
+    warn(
+      `Worker has secret(s) not listed in CLAUDE.md: ${extra.join(", ")}. ` +
+        `If this is an in-flight rotation, ignore. Otherwise update CLAUDE.md ` +
+        `or remove via \`npx wrangler secret delete <NAME>\`.`,
+    );
+  }
+  info(`Worker has all ${REQUIRED_SECRETS.length} required secret(s).`);
+} else {
+  warn(
+    "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set; skipping Worker secret " +
+      "verification. Set both to enable.",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4) Assert today's row presence (skip on offseason)
 // ---------------------------------------------------------------------------
 
 if (wakeCount > 0) {
