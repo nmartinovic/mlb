@@ -96,7 +96,7 @@ Anything in `wrangler.jsonc` under `vars` is **public** — it ships baked into 
 | `NEXT_PUBLIC_POSTHOG_KEY` *(optional)* | Browser analytics (`lib/analytics.js`) — missing key disables tracking | PostHog → Project settings → Project API key |
 | `NEXT_PUBLIC_POSTHOG_HOST` *(optional)* | PostHog ingest host; defaults to `https://us.i.posthog.com` | PostHog dashboard URL |
 
-> The `NEXT_PUBLIC_*` Supabase values are technically not secret (the anon key is shipped to the browser), but they're still stored as Worker secrets so production config lives in one place rather than being split between `vars` and `secret`. RLS is what protects the Supabase data — see `supabase-schema.sql`.
+> The `NEXT_PUBLIC_*` Supabase values are technically not secret (the anon key is shipped to the browser), but they're still stored as Worker secrets so production config lives in one place rather than being split between `vars` and `secret`. RLS is what protects the Supabase data — see `supabase-schema.sql`. **These two values are also the canonical example of the dual-store gotcha below** — they must be set in both the Cloudflare Build store and the runtime Worker secrets store, or cron silently breaks. See [Build store vs. runtime store](#build-store-vs-runtime-store-next_public_-lives-in-both).
 
 To verify production matches this list:
 
@@ -105,6 +105,25 @@ npx wrangler secret list   # should match the secrets table above
 ```
 
 If a secret is missing or extra, fix it before merging — missing-secret regressions have caused outages before (cf. issue #65).
+
+### Build store vs. runtime store: `NEXT_PUBLIC_*` lives in both
+
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` have **two consumers on two different read paths**, and each path reads from a different Cloudflare store. Both stores must hold the value or production breaks in subtle ways. This is the worked example from postmortem #164.
+
+The two read paths:
+
+1. **Next.js HTTP routes** — Webpack's `DefinePlugin` inlines every `NEXT_PUBLIC_*` reference as a string literal **at build time**. The build reads from Cloudflare dashboard → **Build → Variables and secrets**. Once baked into the bundle, the runtime store is irrelevant to HTTP traffic.
+2. **Cron shim** (`scripts/cron-shim.mjs`, bundled by esbuild via `scripts/inject-scheduled.mjs`) — esbuild does **not** inline `NEXT_PUBLIC_*`. The injected `scheduled()` handler reads these values off the Worker `env` bindings at runtime (#163). `env` only contains what's in Cloudflare dashboard → **Settings → Variables and Secrets** (the runtime store).
+
+The failure mode is asymmetric: a missing **runtime** secret breaks the cron only — HTTP routes keep working because their values were already inlined at build time. The site looks healthy. `mlb_cron_runs` goes silent because `createAdminClient` throws before `startRun()` can write a row, and Cloudflare's invocation status stays `ok` because the injected `scheduled()` handler catches and logs the error. There is no user-visible signal until the 26h SLO trips.
+
+Detection layers that catch this if it regresses, in order of how fast they fire:
+
+- **Cron shim startup validation** (#165) — every cron invocation validates required `env` bindings up front and throws a specific error naming the missing binding, so `wrangler tail` shows the cause directly. Detection: next 15-min tick.
+- **`scripts/post-deploy-check.mjs` cross-check** (#166) — the deploy script runs `wrangler secret list` and asserts it matches the documented set above. A missing runtime secret fails the deploy before any cron tick runs. Detection: deploy time.
+- **SLO B1 (`schedule_stale_26h`)** — the 26h backstop that surfaced the original incident. By the time this fires, you've already lost a day of email headroom.
+
+When provisioning a new project or rotating these values, **set them in both stores**. The build store alone makes HTTP work and hides the problem; the runtime store alone leaves the browser bundle without the anon key. See postmortem #164 for the full incident narrative.
 
 ## Secret rotation runbook
 
