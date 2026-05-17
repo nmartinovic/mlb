@@ -15,12 +15,11 @@
 //      createAdminClient on globalThis.__ninthInningCron at worker startup,
 //      bringing those symbols out of the (bundled, internal) module graph.
 //   2. A scheduled() method on the worker's default export. It reads the
-//      shim's functions from globalThis, bridges Worker secrets into
-//      process.env (mirroring OpenNext's populateProcessEnv — see
-//      node_modules/@opennextjs/cloudflare/dist/cli/templates/init.js — which
-//      the fetch wrapper does for us but the scheduled handler bypasses), and
-//      hands the long-running work to ctx.waitUntil() so it gets the 15-min
-//      scheduled-event budget.
+//      shim's functions from globalThis, passes the Worker env bindings
+//      directly to those functions (an earlier version mirrored OpenNext's
+//      populateProcessEnv and wrote to process.env, but that didn't reach the
+//      bundled module graph in workerd — see #163), and hands the long-running
+//      work to ctx.waitUntil() so it gets the 15-min scheduled-event budget.
 //
 // The /api/cron and /api/cron/schedule HTTP routes are unchanged: the
 // /admin break-glass buttons (#110) and any human curl-based recovery still
@@ -75,21 +74,25 @@ const scheduledHandler = `
             console.error("scheduled() invoked before cron shim loaded — bundle is broken");
             return;
         }
-        // Mirror OpenNext's populateProcessEnv: the fetch wrapper bridges Worker
-        // secrets into process.env on the first request, but scheduled() bypasses
-        // that wrapper entirely. lib/cron-jobs.js → lib/brevo.js / supabase-admin
-        // read process.env directly, so populate it before invoking either job.
-        for (const [k, v] of Object.entries(env)) {
-            if (typeof v === "string") process.env[k] = v;
-        }
+        // Pass env explicitly to the bundled cron functions. An earlier version
+        // tried to bridge env into process.env so the libs' process.env reads
+        // would work transparently — that's what OpenNext's fetch wrapper does
+        // for HTTP requests. But the bundled IIFE shim resolves process.env
+        // through its own module graph and doesn't see writes made from this
+        // injected handler (#163). Threading env to each lib is uglier but it
+        // actually works.
         const job = event.cron === "0 13 * * *" ? "schedule" : "main";
         const work = (async () => {
             try {
-                const supabase = cron.createAdminClient();
+                const supabase = cron.createAdminClient(
+                    env.NEXT_PUBLIC_SUPABASE_URL,
+                    env.SUPABASE_SERVICE_ROLE_KEY
+                );
                 const result = job === "schedule"
                     ? await cron.runScheduler({ supabase })
                     : await cron.runMainCron({
                         supabase,
+                        env,
                         emailsPaused: env.EMAILS_PAUSED === "true",
                     });
                 console.log(\`Cron \${job} status \${result.status}\`);
