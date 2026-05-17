@@ -193,12 +193,14 @@ Three pieces, two of them dashboard-only:
 
 ## Cron architecture
 
-Two Cloudflare cron triggers wired in `wrangler.jsonc`, routed to different endpoints by `event.cron` in `scripts/inject-scheduled.mjs` (closes #76):
+Two Cloudflare cron triggers wired in `wrangler.jsonc`, dispatched by `event.cron` in the `scheduled()` handler injected by `scripts/inject-scheduled.mjs` (closes #76, #157):
 
-| Cron | Endpoint | Purpose |
-|------|----------|---------|
-| `0 13 * * *` (daily, 9am ET in EDT) | `/api/cron/schedule` | Pulls today's MLB slate via `fetchDailySchedule`, upserts one row per game into `mlb_cron_schedule` with `expected_finish_at = first_pitch + 3.5h`, prunes rows older than 36h |
-| `*/15 * * * *` (every 15 min) | `/api/cron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits) but still writes a `skipped_no_wake` heartbeat row to `mlb_cron_runs` (#104). Exception (#109): if the table is **entirely empty** during MLB regular season (ET month ∈ [4..10]) the main cron falls through to the full check rather than early-returning, so a dead daily scheduler can't drop a day of emails. Otherwise runs the full check + send fan-out |
+| Cron | Job | Purpose |
+|------|-----|---------|
+| `0 13 * * *` (daily, 9am ET in EDT) | `runScheduler` | Pulls today's MLB slate via `fetchDailySchedule`, upserts one row per game into `mlb_cron_schedule` with `expected_finish_at = first_pitch + 3.5h`, prunes rows older than 36h |
+| `*/15 * * * *` (every 15 min) | `runMainCron` | Reads `mlb_cron_schedule`; if no row's `expected_finish_at` is inside the polling window it returns early (no MLB API hits) but still writes a `skipped_no_wake` heartbeat row to `mlb_cron_runs` (#104). Exception (#109): if the table is **entirely empty** during MLB regular season (ET month ∈ [4..10]) the main cron falls through to the full check rather than early-returning, so a dead daily scheduler can't drop a day of emails. Otherwise runs the full check + send fan-out |
+
+The scheduled handler calls `runMainCron` / `runScheduler` (from `lib/cron-jobs.js`) directly via `ctx.waitUntil()` rather than round-tripping through `this.fetch('/api/cron')`. The HTTP round-trip inherited the ~30s request wall-clock; calling the functions directly gives the work the 15-min scheduled-event budget instead. The `/api/cron` and `/api/cron/schedule` HTTP routes are unchanged and still backstop `/admin` break-glass + any human curl recovery — they just no longer share the path with the cron trigger (#157). The build-time shim that exposes these functions to the injected handler lives at `scripts/cron-shim.mjs`.
 
 The polling window is asymmetric: `expected_finish_at` between `now - 2.5h` and `now + 30m`. Starting 30 min before the predicted finish catches short games; continuing 2.5h after catches extra innings and rain delays. Constants live at the top of `app/api/cron/route.js` (`EARLY_BOUND_MS`, `LATE_BOUND_MS`).
 
