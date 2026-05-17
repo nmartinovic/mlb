@@ -60,7 +60,16 @@ function makeSupabaseMock({
       },
       update: (patch) => {
         updates.push(patch);
-        return { eq: async () => ({ error: null }) };
+        // Two callers: finalizeRun chains .eq(); sweepStuckRuns chains
+        // .in().lt().select() and returns rows swept.
+        return {
+          eq: async () => ({ error: null }),
+          in: () => ({
+            lt: () => ({
+              select: async () => ({ data: [], error: null }),
+            }),
+          }),
+        };
       },
     }),
     mlb_user_teams: () => ({
@@ -120,16 +129,17 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     });
     expect(fetchSchedule).not.toHaveBeenCalled();
     // One heartbeat row: insert (status: running) + update (status: skipped_no_wake).
+    // Also expect a sweep update (#154) targeting status: "failure" via .in().
     expect(inserted).toEqual([{ status: "running" }]);
-    expect(updates).toHaveLength(1);
-    expect(updates[0]).toMatchObject({
+    const finalize = updates.find((u) => u.status === "skipped_no_wake");
+    expect(finalize).toMatchObject({
       status: "skipped_no_wake",
       games_processed: 0,
       emails_sent: 0,
       errors_count: 0,
       errors: null,
     });
-    expect(updates[0].finished_at).toEqual(expect.any(String));
+    expect(finalize.finished_at).toEqual(expect.any(String));
   });
 
   it("queries mlb_cron_schedule with an asymmetric window (now-2.5h, now+30m)", async () => {
@@ -161,7 +171,12 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
         if (table === "mlb_cron_runs") {
           return {
             insert: () => ({ select: () => ({ single: async () => ({ data: { id: "x" }, error: null }) }) }),
-            update: () => ({ eq: async () => ({ error: null }) }),
+            update: () => ({
+              eq: async () => ({ error: null }),
+              in: () => ({
+                lt: () => ({ select: async () => ({ data: [], error: null }) }),
+              }),
+            }),
           };
         }
         throw new Error(`unexpected ${table}`);
@@ -244,8 +259,8 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     });
     expect(fetchSchedule).not.toHaveBeenCalled();
     expect(inserted).toEqual([{ status: "running" }]);
-    expect(updates).toHaveLength(1);
-    expect(updates[0]).toMatchObject({ status: "skipped_no_wake" });
+    // Updates may include a sweep entry (#154) in addition to the finalize.
+    expect(updates.find((u) => u.status === "skipped_no_wake")).toBeDefined();
 
     vi.useRealTimers();
   });
@@ -254,7 +269,12 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     process.env.EMAILS_PAUSED = "true";
     const fromMock = vi.fn(() => ({
       insert: () => ({ select: () => ({ single: async () => ({ data: { id: "p" }, error: null }) }) }),
-      update: () => ({ eq: async () => ({ error: null }) }),
+      update: () => ({
+        eq: async () => ({ error: null }),
+        in: () => ({
+          lt: () => ({ select: async () => ({ data: [], error: null }) }),
+        }),
+      }),
     }));
     createAdminClient.mockReturnValue({ from: fromMock });
 
