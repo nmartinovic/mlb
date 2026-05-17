@@ -97,11 +97,25 @@ describe("inject-scheduled", () => {
     );
   });
 
-  it("bridges Worker env into process.env (OpenNext fetch wrapper does this, scheduled bypasses it)", () => {
+  it("passes env directly to the bundled cron functions instead of bridging process.env (#163)", () => {
     runInject();
     const patched = readFileSync(workerPath, "utf-8");
-    expect(patched).toContain("process.env");
-    expect(patched).toContain("Object.entries(env)");
+    const scheduledIdx = patched.indexOf("async scheduled");
+    const scheduledBlock = patched.slice(
+      scheduledIdx,
+      patched.indexOf("async fetch", scheduledIdx)
+    );
+    // The supabase URL/key come straight off env, not process.env. The earlier
+    // process.env bridge silently failed in workerd because the bundled IIFE
+    // shim doesn't see writes made from this injected handler — #163.
+    expect(scheduledBlock).toContain("env.NEXT_PUBLIC_SUPABASE_URL");
+    expect(scheduledBlock).toContain("env.SUPABASE_SERVICE_ROLE_KEY");
+    // runMainCron receives env so it can thread EMAIL_API_KEY / FROM_EMAIL /
+    // SITE_URL / TIP_URL to brevo + email-template.
+    expect(scheduledBlock).toMatch(/runMainCron\(\{[^}]*env[^}]*\}\)/s);
+    // The doomed process.env bridge must stay gone.
+    expect(scheduledBlock).not.toContain("process.env[");
+    expect(scheduledBlock).not.toContain("Object.entries(env)");
   });
 
   it("is idempotent — running it twice does not double-inject", () => {
