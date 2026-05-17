@@ -114,11 +114,14 @@ create index idx_mlb_cron_schedule_expected_finish on public.mlb_cron_schedule(e
 -- Service-role-only: only the cron worker reads/writes this table.
 alter table public.mlb_cron_schedule enable row level security;
 
--- Out-of-band SLO alarms (#107). A pg_cron job runs every 5 minutes and
--- emails ADMIN_EMAIL when either of these silent-failure SLOs trip:
+-- Out-of-band SLO alarms (#107, #158). A pg_cron job runs every 5 minutes
+-- and emails ADMIN_EMAIL when any of these silent-failure SLOs trip:
 --   B1: no row with status starting 'schedule_' in mlb_cron_runs for 26h.
 --   B2: no row at all in mlb_cron_runs for 30m, during MLB regular season
 --       (April–October in America/New_York).
+--   B3: any row in mlb_cron_runs has been in 'running' or 'schedule_running'
+--       for >20m (matches STALE_RUNNING_MS in lib/cron-jobs.js so the
+--       sweeper and the alarm describe the same boundary).
 -- We only email on edge transitions (not firing -> firing) so a stuck
 -- alarm doesn't spam every 5 minutes. Recovery is silent.
 --
@@ -152,7 +155,8 @@ alter table public.mlb_alarm_state enable row level security;
 
 insert into public.mlb_alarm_state (slo_id, firing) values
   ('schedule_stale_26h', false),
-  ('cron_silent_30m', false)
+  ('cron_silent_30m', false),
+  ('cron_stuck_running_20m', false)
 on conflict (slo_id) do nothing;
 
 -- Email sender. Reads Brevo creds from Vault and posts asynchronously via
@@ -207,10 +211,13 @@ declare
   v_in_season boolean := extract(month from (v_now at time zone 'America/New_York')) between 4 and 10;
   v_schedule_recent_count int;
   v_cron_recent_count int;
+  v_stuck_running_count int;
   v_schedule_firing boolean;
   v_cron_firing boolean;
+  v_stuck_firing boolean;
   v_prev_schedule boolean;
   v_prev_cron boolean;
+  v_prev_stuck boolean;
 begin
   select count(*) into v_schedule_recent_count
   from public.mlb_cron_runs
@@ -221,11 +228,18 @@ begin
   from public.mlb_cron_runs
   where started_at > v_now - interval '30 minutes';
 
+  select count(*) into v_stuck_running_count
+  from public.mlb_cron_runs
+  where status in ('running', 'schedule_running')
+    and started_at < v_now - interval '20 minutes';
+
   v_schedule_firing := v_schedule_recent_count = 0;
   v_cron_firing := v_in_season and v_cron_recent_count = 0;
+  v_stuck_firing := v_stuck_running_count > 0;
 
   select firing into v_prev_schedule from public.mlb_alarm_state where slo_id = 'schedule_stale_26h';
   select firing into v_prev_cron     from public.mlb_alarm_state where slo_id = 'cron_silent_30m';
+  select firing into v_prev_stuck    from public.mlb_alarm_state where slo_id = 'cron_stuck_running_20m';
 
   -- B1: schedule_* row missing for 26h
   if v_schedule_firing and not coalesce(v_prev_schedule, false) then
@@ -265,6 +279,30 @@ begin
     update public.mlb_alarm_state
        set firing = false, last_changed_at = v_now
      where slo_id = 'cron_silent_30m';
+  end if;
+
+  -- B3: any row stuck in 'running' or 'schedule_running' for >20m. Matches
+  -- STALE_RUNNING_MS in lib/cron-jobs.js — the sweeper will force-finalize
+  -- on the next tick, but the alarm closes the loop so the operator knows
+  -- it happened rather than the system silently self-healing.
+  if v_stuck_firing and not coalesce(v_prev_stuck, false) then
+    perform public._mlb_send_alarm_email(
+      '[ninthinning] SLO B3 firing: cron run stuck >20m',
+      format(
+        '%s row(s) in mlb_cron_runs have been in "running" or "schedule_running" for more than 20 minutes.%s' ||
+        'A cron tick started but never reached finalizeRun — likely killed by the Cloudflare wall-clock or a hung dependency.%s' ||
+        'The next tick''s sweepStuckRuns() will force-finalize these to status="failure"; check /admin for the failure reason.%s' ||
+        'Detected at: %s UTC',
+        v_stuck_running_count, E'\n\n', E'\n\n', E'\n\n', v_now
+      )
+    );
+    update public.mlb_alarm_state
+       set firing = true, last_changed_at = v_now, last_notified_at = v_now
+     where slo_id = 'cron_stuck_running_20m';
+  elsif (not v_stuck_firing) and coalesce(v_prev_stuck, false) then
+    update public.mlb_alarm_state
+       set firing = false, last_changed_at = v_now
+     where slo_id = 'cron_stuck_running_20m';
   end if;
 end;
 $$;

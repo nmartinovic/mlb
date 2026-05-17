@@ -235,6 +235,7 @@ The `/admin` banner is passive — it only helps if the operator looks. A pg_cro
 |-----|-----------|---------|
 | **B1** (`schedule_stale_26h`) | No `schedule_*` row in `mlb_cron_runs` for 26h | Daily 9am-ET scheduler is dead |
 | **B2** (`cron_silent_30m`) | No row in `mlb_cron_runs` for 30m, **April–October ET only** | Cloudflare cron triggers themselves are down |
+| **B3** (`cron_stuck_running_20m`) | Any row in `mlb_cron_runs` with status `running` or `schedule_running` and `started_at` >20m ago | A cron tick started but never reached `finalizeRun` (killed by Cloudflare wall-clock or hung dependency). Threshold matches `STALE_RUNNING_MS` in `lib/cron-jobs.js` so `sweepStuckRuns()` cleans up on the next tick — the alarm closes the loop so the operator knows it happened rather than the system silently self-healing (#158) |
 
 Emails fire on `not firing → firing` edge transitions only. Recovery is silent (no "all clear" email) so a flapping SLO doesn't spam. State per SLO lives in `public.mlb_alarm_state`.
 
