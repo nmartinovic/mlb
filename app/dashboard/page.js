@@ -16,10 +16,16 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const { data: userTeams } = await supabase
+  const { data: userTeams, error: userTeamsError } = await supabase
     .from("mlb_user_teams")
     .select("team_id")
     .eq("user_id", user.id);
+
+  if (userTeamsError) {
+    // Surface to the error boundary at app/dashboard/error.js so the user
+    // sees a recoverable retry UI rather than a silent empty grid.
+    throw new Error(`Failed to load followed teams: ${userTeamsError.message}`);
+  }
 
   const followedIds = new Set((userTeams || []).map((r) => r.team_id));
   const followedCount = followedIds.size;
@@ -85,6 +91,21 @@ export default async function DashboardPage() {
                 View recent highlights →
               </Link>
             </div>
+
+            {followedCount === 0 && (
+              <div
+                role="status"
+                className="mt-8 rounded-2xl border border-[#1f3a2c] bg-[#0f2a1f]/40 px-5 py-4 text-sm text-[#a8a299]"
+              >
+                <p className="font-semibold text-[#f7f5ef]">
+                  Pick your first team to get started
+                </p>
+                <p className="mt-1">
+                  Tap any team below and we&apos;ll start sending spoiler-free
+                  recaps the morning after every game.
+                </p>
+              </div>
+            )}
 
             <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
           </div>
