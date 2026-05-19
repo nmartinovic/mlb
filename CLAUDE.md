@@ -106,6 +106,16 @@ npx wrangler secret list   # should match the secrets table above
 
 If a secret is missing or extra, fix it before merging — missing-secret regressions have caused outages before (cf. issue #65).
 
+### Credentials managed outside the worker
+
+Not every long-lived credential lives in Cloudflare. Some are consumed by Supabase or other upstreams and are configured in their dashboards instead — `wrangler secret list` will not show them and `npm run deploy` will not touch them, but they are on the same quarterly rotation cadence as the Worker secrets above.
+
+| Name | Used by | Where it lives upstream | Notes |
+|------|---------|-------------------------|-------|
+| **Brevo SMTP key** | Supabase Auth (magic-link sender, see #97) | Supabase dashboard → Project Settings → Auth → SMTP Settings → Password | **Not** a Worker secret. Distinct from the transactional `EMAIL_API_KEY` used by `lib/brevo.js` — different Brevo credential type (SMTP key vs. API key), even though both bill against the same Brevo plan quota. Minted in Brevo → SMTP & API → SMTP. |
+
+Failure mode worth flagging: when this credential is bad (expired, revoked, mistyped), Supabase Auth returns the **same** "check your email" response to the user that a successful send does. There is no Worker-side error path because our worker never sees the SMTP call. The only signal is users reporting missing magic links — so any "auth broken" on-call escalation should include a test magic-link send as an early diagnostic step.
+
 ### Build store vs. runtime store: `NEXT_PUBLIC_*` lives in both
 
 `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` have **two consumers on two different read paths**, and each path reads from a different Cloudflare store. Both stores must hold the value or production breaks in subtle ways. This is the worked example from postmortem #164.
@@ -127,7 +137,7 @@ When provisioning a new project or rotating these values, **set them in both sto
 
 ## Secret rotation runbook
 
-Target: any individual secret can be rotated end-to-end in **≤ 30 minutes** with zero email loss. Run through this list dry once per quarter so the steps stay current.
+Target: any individual secret can be rotated end-to-end in **≤ 30 minutes** with zero email loss. Run through this list dry once per quarter so the steps stay current — that quarterly dry-run covers both the Worker secrets below **and** the Brevo SMTP key (see "Credentials managed outside the worker" above), which follows a separate Supabase-dashboard flow documented further down.
 
 General flow for every secret:
 
@@ -145,6 +155,16 @@ Per-secret specifics:
 - **`EMAIL_API_KEY`** — Brevo → SMTP & API → API keys → "Create a new API key", then delete the old key after step 4.
 - **`CRON_SECRET`** — `openssl rand -hex 32` locally → `wrangler secret put CRON_SECRET` → deploy. The cron only calls itself, so there is no third party to update.
 - **`TIP_URL`** *(not a secret, but rotated similarly)* — Edit `wrangler.jsonc` and redeploy.
+
+For the **Brevo SMTP key** (managed in the Supabase dashboard, not as a Worker secret — see "Credentials managed outside the worker" above), the general flow above does **not** apply: there is nothing to `wrangler secret put` and no `npm run deploy` step. Follow this block instead:
+
+1. **Mint** a new SMTP key in Brevo → SMTP & API → SMTP → "Generate a new SMTP key". Do not revoke the old one yet.
+2. **Paste** it into Supabase dashboard → Project Settings → Auth → SMTP Settings → Password, then click Save. No deploy needed — Supabase picks up the new value on the next sign-in attempt.
+3. **Verify** by sending a test magic link: Supabase dashboard → Authentication → Users → pick your row → "Send magic link". Confirm the email arrives from `Ninth Inning Email <highlights@ninthinning.email>` and that the link signs you in successfully. (Sending a real magic link from `/login` works too, but routes through our rate limiters.)
+4. **Revoke** the old SMTP key in Brevo → SMTP & API → SMTP.
+5. **Record** the rotation in `INCIDENT.md` under "Incident log" with the date and reason.
+
+Outage window for this credential is the gap between step 1 and step 2: existing in-flight magic-link sends keep working on the old key until you save the new one, and Supabase swallows any SMTP error into the same "check your email" UI (see failure-mode note above), so a botched paste is silent — that's why step 3 verifies a real send rather than trusting the dashboard.
 
 If you suspect a leak rather than a routine rotation, also: review `wrangler tail` for unauthorized requests over the last 24h, set `EMAILS_PAUSED=true` per `INCIDENT.md` if the leaked secret could send mail, and open an incident issue.
 
