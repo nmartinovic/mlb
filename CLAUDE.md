@@ -250,17 +250,19 @@ Failure modes worth knowing:
 - **Game runs longer than 6h** (extra innings + rain) → the polling window expires and the every-15-min cron stops checking. The next day's scheduler doesn't re-add yesterday's games, but the existing `getDatesToCheck` helper in `lib/mlb.js` keeps the *full-run* path looking back 2 days, so the **next** valid wake (a different team's game today) will catch the late finisher when it runs the fan-out.
 - **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
 
-`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
+`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake`, `dry_run` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). `dry_run` (#180) marks a `runMainCron({ dryRun: true })` invocation — the full pipeline ran but the Brevo send and `mlb_sent_notifications` insert were skipped; treat such rows as diagnostic, not real sends. Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
 
 ## Break-glass recovery (#110)
 
 When you need to manually kick the cron — e.g. the daily scheduler missed a tick, or a *every-15-min run silently early-returned during a deploy window — the primary recovery path is the **/admin** page, not curl + bearer token.
 
-Three buttons on `/admin`:
+Buttons on `/admin`:
 
 - **Run daily scheduler now** — invokes the same code path as `GET /api/cron/schedule` (populates `mlb_cron_schedule` for today).
 - **Run main cron now** — invokes the same code path as `GET /api/cron` (checks for completed games and sends emails).
+- **Force run main cron (catch up missed)** — same as above but with `force: true`, bypassing the wake-window gate (#154).
 - **Resend latest recap to me** (#150) — re-renders the admin's most recent recap with the current `buildEmailHtml` and sends it back to `ADMIN_EMAIL` with a `[TEST]` subject prefix. Uses `lib/resend-recap.js`, which prefers the latest `mlb_sent_notifications` row for the admin (excluding the welcome sentinel `game_pk = 0`) and falls back to the most recent `mlb_game_cache` row with a `highlight_url`. Standings are re-fetched the same way `runMainCron` does so template changes that depend on `extractTeamStanding` are exercised. Does **not** write to `mlb_sent_notifications` (so it won't block future real sends or pollute analytics) and respects `EMAILS_PAUSED`.
+- **Dry run main cron** (#180) — invokes `runMainCron({ force: true, dryRun: true })`: every read path runs for real (Supabase, MLB API, highlight extraction, `buildEmailHtml`) but the Brevo send and the `mlb_sent_notifications` insert are skipped. Renders an inline report of would-be emails — game PKs, matched subscribers, subjects, highlight URLs. The `mlb_game_cache` upsert still runs (safe write) and the run logs as status `dry_run`. Safe to click at any time; unaffected by `EMAILS_PAUSED` since nothing is sent. End-to-end coverage lives in `lib/cron-jobs.integration.test.js`.
 
 All run as Next.js Server Actions. Auth is the existing admin session check: the action calls `assertAdmin()` server-side (re-checks `auth.getUser()` and `ADMIN_EMAIL`) before doing any work — `notFound()` on the page hides the buttons but is **not** the security boundary. No `CRON_SECRET` is required, since auth is via the user session, not a bearer token. The shared cron logic lives in `lib/cron-jobs.js` (`runMainCron` and `runScheduler`); both the route handlers and the server actions call into it.
 

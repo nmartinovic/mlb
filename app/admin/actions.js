@@ -80,6 +80,31 @@ export async function forceRunMainCronAction(_prevState, _formData) {
   };
 }
 
+// Dry run (#180): runs the full main-cron pipeline — schedule read, MLB API,
+// cache, dedup, email render — but skips the Brevo send and the
+// mlb_sent_notifications insert. Safe to click at any time; no email goes out
+// and EMAILS_PAUSED is irrelevant. Returns a dryRunReport of would-be emails.
+export async function dryRunMainCronAction(_prevState, _formData) {
+  const auth = await assertAdmin();
+  if (!auth.ok) {
+    return { ok: false, message: auth.error, ranAt: new Date().toISOString() };
+  }
+
+  const supabase = createAdminClient();
+  const { status, body } = await runMainCron({
+    supabase,
+    force: true,
+    dryRun: true,
+  });
+  return {
+    ok: status < 400,
+    message: body.message || body.error || "ran",
+    errors: body.errors,
+    dryRunReport: body.dryRunReport || [],
+    ranAt: new Date().toISOString(),
+  };
+}
+
 export async function resendLatestRecapAction(_prevState, _formData) {
   const ranAt = new Date().toISOString();
   const auth = await assertAdmin();
