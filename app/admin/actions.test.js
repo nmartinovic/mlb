@@ -36,7 +36,37 @@ vi.mock("@/lib/mlb", async () => {
 });
 
 // Imported after vi.mock so the mocked deps resolve.
-const { resendLatestRecapAction } = await import("./actions");
+const { resendLatestRecapAction, dryRunMainCronAction } = await import("./actions");
+
+// A Supabase stub shaped for the runMainCron pipeline. With no rows in
+// mlb_user_teams, the run short-circuits on the "no_subscribers" path — enough
+// to exercise dryRunMainCronAction's wiring without a full fixture (the
+// end-to-end fan-out is covered by lib/cron-jobs.integration.test.js).
+function makeCronSupabaseStub() {
+  return {
+    from(table) {
+      if (table === "mlb_cron_runs") {
+        return {
+          insert: () => ({
+            select: () => ({
+              single: async () => ({ data: { id: "run-1" }, error: null }),
+            }),
+          }),
+          update: () => ({
+            eq: async () => ({ error: null }),
+            in: () => ({
+              lt: () => ({ select: async () => ({ data: [], error: null }) }),
+            }),
+          }),
+        };
+      }
+      if (table === "mlb_user_teams") {
+        return { select: () => ({ limit: async () => ({ data: [], error: null }) }) };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+}
 
 // Builds a chainable Supabase query stub. Each call to `.from(table)` returns a
 // fresh query object whose terminal calls (`.maybeSingle()`, `.single()`,
@@ -175,6 +205,29 @@ describe("resendLatestRecapAction", () => {
 
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/paused/i);
+    expect(hoisted.sendEmailImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("dryRunMainCronAction (#180)", () => {
+  it("rejects a non-admin caller without running the cron", async () => {
+    hoisted.authUser = { id: "other-id", email: "imposter@example.com" };
+
+    const result = await dryRunMainCronAction(null, null);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("Forbidden");
+    expect(hoisted.sendEmailImpl).not.toHaveBeenCalled();
+  });
+
+  it("runs the dry-run pipeline for an admin and returns a dryRunReport", async () => {
+    hoisted.adminSupabase = makeCronSupabaseStub();
+
+    const result = await dryRunMainCronAction(null, null);
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("No subscribed teams");
+    expect(result.dryRunReport).toEqual([]);
     expect(hoisted.sendEmailImpl).not.toHaveBeenCalled();
   });
 });

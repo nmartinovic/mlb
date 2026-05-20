@@ -8,6 +8,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:staging": "vitest run --config vitest.staging.config.mjs",
+    "predeploy": "vitest run",
     "preview": "opennextjs-cloudflare build && node scripts/inject-scheduled.mjs && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && node scripts/inject-scheduled.mjs && opennextjs-cloudflare deploy && node scripts/post-deploy-check.mjs"
   },

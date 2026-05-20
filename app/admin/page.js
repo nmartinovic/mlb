@@ -14,6 +14,7 @@ const STATUS_COLORS = {
   no_subscribers: "text-gray-500",
   no_new_highlights: "text-gray-500",
   skipped_no_wake: "text-gray-500",
+  dry_run: "text-indigo-400",
   schedule_running: "text-blue-400",
   schedule_built: "text-green-400",
   schedule_partial: "text-yellow-400",

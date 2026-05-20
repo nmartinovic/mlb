@@ -22,6 +22,20 @@ npm run preview    # Cloudflare local preview
 npm run deploy     # Deploy to Cloudflare (then bootstrap + smoke test, see below)
 ```
 
+### `npm run deploy` pre-deploy test gate (#180)
+
+`npm run deploy` will not build or ship unless the full test suite passes
+first. This is the `predeploy` script in `package.json` (`vitest run`) — npm
+runs any `pre<script>` hook automatically before the script itself, so a
+failing test exits non-zero and aborts the deploy **before** `opennextjs-cloudflare build` runs. Nothing reaches Cloudflare unless all 15
+test files pass, including `lib/cron-jobs.integration.test.js`, which exercises
+the full `runMainCron` fan-out end-to-end (the class of bug from #172/#178).
+
+This is a local gate; the same `npm test` also runs in CI on every pull
+request (`.github/workflows/test.yml`). Treat the integration test fixture as
+living — when a new incident or edge case surfaces, add a scenario to it so the
+gate widens over time.
+
 ### `npm run deploy` post-deploy checks (#108)
 
 After `opennextjs-cloudflare deploy` succeeds, the script chains
@@ -250,21 +264,55 @@ Failure modes worth knowing:
 - **Game runs longer than 6h** (extra innings + rain) → the polling window expires and the every-15-min cron stops checking. The next day's scheduler doesn't re-add yesterday's games, but the existing `getDatesToCheck` helper in `lib/mlb.js` keeps the *full-run* path looking back 2 days, so the **next** valid wake (a different team's game today) will catch the late finisher when it runs the fan-out.
 - **DST**: `0 13 * * *` UTC is 9am EDT (most of the MLB regular season) and 8am EST (March/late-October). Both are fine — early-morning is the goal, not exactly 9am.
 
-`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
+`mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake`, `dry_run` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). `dry_run` (#180) marks a `runMainCron({ dryRun: true })` invocation — the full pipeline ran but the Brevo send and `mlb_sent_notifications` insert were skipped; treat such rows as diagnostic, not real sends. Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
 
 ## Break-glass recovery (#110)
 
 When you need to manually kick the cron — e.g. the daily scheduler missed a tick, or a *every-15-min run silently early-returned during a deploy window — the primary recovery path is the **/admin** page, not curl + bearer token.
 
-Three buttons on `/admin`:
+Buttons on `/admin`:
 
 - **Run daily scheduler now** — invokes the same code path as `GET /api/cron/schedule` (populates `mlb_cron_schedule` for today).
 - **Run main cron now** — invokes the same code path as `GET /api/cron` (checks for completed games and sends emails).
+- **Force run main cron (catch up missed)** — same as above but with `force: true`, bypassing the wake-window gate (#154).
 - **Resend latest recap to me** (#150) — re-renders the admin's most recent recap with the current `buildEmailHtml` and sends it back to `ADMIN_EMAIL` with a `[TEST]` subject prefix. Uses `lib/resend-recap.js`, which prefers the latest `mlb_sent_notifications` row for the admin (excluding the welcome sentinel `game_pk = 0`) and falls back to the most recent `mlb_game_cache` row with a `highlight_url`. Standings are re-fetched the same way `runMainCron` does so template changes that depend on `extractTeamStanding` are exercised. Does **not** write to `mlb_sent_notifications` (so it won't block future real sends or pollute analytics) and respects `EMAILS_PAUSED`.
+- **Dry run main cron** (#180) — invokes `runMainCron({ force: true, dryRun: true })`: every read path runs for real (Supabase, MLB API, highlight extraction, `buildEmailHtml`) but the Brevo send and the `mlb_sent_notifications` insert are skipped. Renders an inline report of would-be emails — game PKs, matched subscribers, subjects, highlight URLs. The `mlb_game_cache` upsert still runs (safe write) and the run logs as status `dry_run`. Safe to click at any time; unaffected by `EMAILS_PAUSED` since nothing is sent. End-to-end coverage lives in `lib/cron-jobs.integration.test.js`.
 
 All run as Next.js Server Actions. Auth is the existing admin session check: the action calls `assertAdmin()` server-side (re-checks `auth.getUser()` and `ADMIN_EMAIL`) before doing any work — `notFound()` on the page hides the buttons but is **not** the security boundary. No `CRON_SECRET` is required, since auth is via the user session, not a bearer token. The shared cron logic lives in `lib/cron-jobs.js` (`runMainCron` and `runScheduler`); both the route handlers and the server actions call into it.
 
 Recovery time goes from ~10 min (rotate `CRON_SECRET`, then DevTools fetch) to ~30 sec (open `/admin`, click button). The 2026-05-02 incident in `INCIDENT.md` is the canonical example of why this matters: not having `CRON_SECRET` saved blocked recovery for the first ~10 min.
+
+## Staging dry-run automation (#180)
+
+`runMainCron`'s dry-run mode is also wired to an isolated **staging Supabase project** so the full pipeline can be smoke-tested against a real database — real PostgREST queries, real RLS-bypass, real `mlb_game_cache` upserts — not just the mocked fixtures in `lib/cron-jobs.integration.test.js`. This is the automated layer that catches bugs only a real database surfaces: query-shape errors, client misconfiguration, PostgREST incompatibilities.
+
+### Layout
+
+| Piece | Role |
+|-------|------|
+| `lib/cron-jobs.staging.test.js` | Runs `runMainCron({ force: true, dryRun: true })` against the staging project + the live MLB Stats API, with only the Brevo send stubbed (stubbed to *throw*, so a regression that tried to send fails loudly). A live smoke test — asserts the pipeline completes end-to-end and finalizes with status `dry_run`, not a specific set of emails (report contents depend on MLB's actual slate). |
+| `createStagingClient()` in `lib/supabase-admin.js` | Service-role client for the staging project; returns `null` when the staging env vars are unset. |
+| `supabase/staging-seed.sql` | Fixture seed — run once, after `supabase-schema.sql`: a superfan subscribed to all 30 teams plus a two-team subscriber, so whichever games MLB actually played, the fan-out is exercised. |
+| `vitest.staging.config.mjs` | Dedicated vitest config; the staging test is **excluded** from the default config so `npm test` stays deterministic. |
+| `.github/workflows/dry-run-staging.yml` | Runs `npm run test:staging` on every PR and daily at 13:30 UTC. |
+
+### Why it is separate from `npm test`
+
+The staging test is **excluded** from the default `npm test` / `predeploy` gate (see the `exclude` glob in `vitest.config.mjs`) and runs only via `npm run test:staging`. It makes live network calls to the MLB API, so keeping it out of the deterministic gate means MLB API flakiness can never block a deploy. `lib/cron-jobs.integration.test.js` stays the always-on gate; the staging dry-run is the live-infra smoke test layered on top.
+
+When `SUPABASE_STAGING_URL` / `SUPABASE_STAGING_SERVICE_ROLE_KEY` are unset the suite skips cleanly — so the CI job is green on forks and before staging is provisioned.
+
+### One-time setup
+
+1. Create a **free-tier Supabase project** — this is the staging project, kept entirely separate from production.
+2. Run `supabase-schema.sql` against it, then `supabase/staging-seed.sql`. (The SLO-alarm `pg_cron`/`pg_net`/Vault setup at the bottom of the schema is production-only — it is harmless on staging but does not need its Vault secrets.)
+3. Add two **GitHub Actions repository secrets**: `SUPABASE_STAGING_URL` and `SUPABASE_STAGING_SERVICE_ROLE_KEY` (the staging project's URL and service-role key). Set the same two as local env vars to run `npm run test:staging` from your machine.
+
+These two values are **not** Worker secrets and are never read by production — they exist only for the CI dry-run, so they do not belong in the `wrangler secret list` check. Keep `dry-run-staging` an informational (non-required) check until staging has proven stable; the deterministic `test` job is the hard merge gate.
+
+### Housekeeping
+
+Each staging dry-run inserts an `mlb_cron_runs` row and upserts `mlb_game_cache` rows into the staging project. Nothing prunes them — on the free tier this is harmless for a long time; truncate the two tables in the staging project if they ever get noisy.
 
 ## Out-of-band SLO alarms (#107)
 
