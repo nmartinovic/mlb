@@ -10,6 +10,14 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.{js,mjs}"],
-    exclude: ["node_modules/**", ".next/**", ".open-next/**"],
+    // *.staging.test.* runs only via `npm run test:staging`
+    // (vitest.staging.config.mjs) — it makes live network calls and must not
+    // gate the deterministic `npm test` / predeploy run. See #180.
+    exclude: [
+      "node_modules/**",
+      ".next/**",
+      ".open-next/**",
+      "**/*.staging.test.{js,mjs}",
+    ],
   },
 });

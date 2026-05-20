@@ -282,6 +282,38 @@ All run as Next.js Server Actions. Auth is the existing admin session check: the
 
 Recovery time goes from ~10 min (rotate `CRON_SECRET`, then DevTools fetch) to ~30 sec (open `/admin`, click button). The 2026-05-02 incident in `INCIDENT.md` is the canonical example of why this matters: not having `CRON_SECRET` saved blocked recovery for the first ~10 min.
 
+## Staging dry-run automation (#180)
+
+`runMainCron`'s dry-run mode is also wired to an isolated **staging Supabase project** so the full pipeline can be smoke-tested against a real database — real PostgREST queries, real RLS-bypass, real `mlb_game_cache` upserts — not just the mocked fixtures in `lib/cron-jobs.integration.test.js`. This is the automated layer that catches bugs only a real database surfaces: query-shape errors, client misconfiguration, PostgREST incompatibilities.
+
+### Layout
+
+| Piece | Role |
+|-------|------|
+| `lib/cron-jobs.staging.test.js` | Runs `runMainCron({ force: true, dryRun: true })` against the staging project + the live MLB Stats API, with only the Brevo send stubbed (stubbed to *throw*, so a regression that tried to send fails loudly). A live smoke test — asserts the pipeline completes end-to-end and finalizes with status `dry_run`, not a specific set of emails (report contents depend on MLB's actual slate). |
+| `createStagingClient()` in `lib/supabase-admin.js` | Service-role client for the staging project; returns `null` when the staging env vars are unset. |
+| `supabase/staging-seed.sql` | Fixture seed — run once, after `supabase-schema.sql`: a superfan subscribed to all 30 teams plus a two-team subscriber, so whichever games MLB actually played, the fan-out is exercised. |
+| `vitest.staging.config.mjs` | Dedicated vitest config; the staging test is **excluded** from the default config so `npm test` stays deterministic. |
+| `.github/workflows/dry-run-staging.yml` | Runs `npm run test:staging` on every PR and daily at 13:30 UTC. |
+
+### Why it is separate from `npm test`
+
+The staging test is **excluded** from the default `npm test` / `predeploy` gate (see the `exclude` glob in `vitest.config.mjs`) and runs only via `npm run test:staging`. It makes live network calls to the MLB API, so keeping it out of the deterministic gate means MLB API flakiness can never block a deploy. `lib/cron-jobs.integration.test.js` stays the always-on gate; the staging dry-run is the live-infra smoke test layered on top.
+
+When `SUPABASE_STAGING_URL` / `SUPABASE_STAGING_SERVICE_ROLE_KEY` are unset the suite skips cleanly — so the CI job is green on forks and before staging is provisioned.
+
+### One-time setup
+
+1. Create a **free-tier Supabase project** — this is the staging project, kept entirely separate from production.
+2. Run `supabase-schema.sql` against it, then `supabase/staging-seed.sql`. (The SLO-alarm `pg_cron`/`pg_net`/Vault setup at the bottom of the schema is production-only — it is harmless on staging but does not need its Vault secrets.)
+3. Add two **GitHub Actions repository secrets**: `SUPABASE_STAGING_URL` and `SUPABASE_STAGING_SERVICE_ROLE_KEY` (the staging project's URL and service-role key). Set the same two as local env vars to run `npm run test:staging` from your machine.
+
+These two values are **not** Worker secrets and are never read by production — they exist only for the CI dry-run, so they do not belong in the `wrangler secret list` check. Keep `dry-run-staging` an informational (non-required) check until staging has proven stable; the deterministic `test` job is the hard merge gate.
+
+### Housekeeping
+
+Each staging dry-run inserts an `mlb_cron_runs` row and upserts `mlb_game_cache` rows into the staging project. Nothing prunes them — on the free tier this is harmless for a long time; truncate the two tables in the staging project if they ever get noisy.
+
 ## Out-of-band SLO alarms (#107)
 
 The `/admin` banner is passive — it only helps if the operator looks. A pg_cron job inside Supabase runs every 5 minutes and emails `ADMIN_EMAIL` directly when either silent-failure SLO trips:

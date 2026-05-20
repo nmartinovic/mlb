@@ -1,0 +1,35 @@
+name: dry-run-staging
+
+# Automated end-to-end dry-run of the cron pipeline against the staging
+# Supabase project (#180). Separate from the `test` workflow on purpose: this
+# makes live MLB Stats API + staging-Supabase calls, so it must not gate the
+# deterministic test suite. Keep it an informational (non-required) check
+# until staging has proven stable.
+#
+# Requires two repository secrets — SUPABASE_STAGING_URL and
+# SUPABASE_STAGING_SERVICE_ROLE_KEY. When they are absent (forks, or before
+# staging is provisioned) the test self-skips and the job passes green.
+
+on:
+  pull_request:
+  schedule:
+    # 13:30 UTC daily (~9:30am ET) — after the previous night's MLB slate has
+    # gone final, so the dry-run has real completed games to fan out against.
+    - cron: "30 13 * * *"
+
+jobs:
+  dry-run-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run test:staging
+        env:
+          SUPABASE_STAGING_URL: ${{ secrets.SUPABASE_STAGING_URL }}
+          SUPABASE_STAGING_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_STAGING_SERVICE_ROLE_KEY }}
