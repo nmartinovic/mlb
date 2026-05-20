@@ -22,6 +22,20 @@ npm run preview    # Cloudflare local preview
 npm run deploy     # Deploy to Cloudflare (then bootstrap + smoke test, see below)
 ```
 
+### `npm run deploy` pre-deploy test gate (#180)
+
+`npm run deploy` will not build or ship unless the full test suite passes
+first. This is the `predeploy` script in `package.json` (`vitest run`) — npm
+runs any `pre<script>` hook automatically before the script itself, so a
+failing test exits non-zero and aborts the deploy **before** `opennextjs-cloudflare build` runs. Nothing reaches Cloudflare unless all 15
+test files pass, including `lib/cron-jobs.integration.test.js`, which exercises
+the full `runMainCron` fan-out end-to-end (the class of bug from #172/#178).
+
+This is a local gate; the same `npm test` also runs in CI on every pull
+request (`.github/workflows/test.yml`). Treat the integration test fixture as
+living — when a new incident or edge case surfaces, add a scenario to it so the
+gate widens over time.
+
 ### `npm run deploy` post-deploy checks (#108)
 
 After `opennextjs-cloudflare deploy` succeeds, the script chains
