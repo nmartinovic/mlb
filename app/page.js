@@ -3,6 +3,10 @@ import { TEAMS_BY_ID } from "@/lib/teams";
 import { createClient } from "@/lib/supabase-server";
 import { BrandLockup, DiamondGlyph } from "@/components/brand";
 
+export const metadata = {
+  alternates: { canonical: "/" },
+};
+
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
 function EmailPreview({ size = "sm", showInboxRow = false }) {
