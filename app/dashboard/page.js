@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase-server";
 import { MLB_TEAMS } from "@/lib/teams";
 import TeamGrid from "./team-grid";
 import SignupTracker from "./signup-tracker";
+import DeleteAccount from "./delete-account";
 import { Suspense } from "react";
 import pkg from "../../package.json";
 import { BrandLockup } from "@/components/brand";
@@ -108,6 +109,19 @@ export default async function DashboardPage() {
             )}
 
             <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
+
+            <div className="mt-16 border-t border-[#1f3a2c] pt-8">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-[#a8a299]">
+                Account
+              </h2>
+              <p className="mt-2 max-w-prose text-sm text-[#a8a299]">
+                Deleting your account permanently removes your email address,
+                the teams you follow, and your recap history. This can&apos;t be
+                undone — to simply stop emails without losing your account, use
+                the unsubscribe link instead.
+              </p>
+              <DeleteAccount />
+            </div>
           </div>
         </section>
       </main>
