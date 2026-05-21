@@ -5,6 +5,7 @@ import { MLB_TEAMS } from "@/lib/teams";
 import TeamGrid from "./team-grid";
 import SignupTracker from "./signup-tracker";
 import DeleteAccount from "./delete-account";
+import PauseControl from "./pause-control";
 import { Suspense } from "react";
 import pkg from "../../package.json";
 import { BrandLockup } from "@/components/brand";
@@ -31,6 +32,15 @@ export default async function DashboardPage() {
   const followedIds = new Set((userTeams || []).map((r) => r.team_id));
   const followedCount = followedIds.size;
   const tipUrl = process.env.TIP_URL;
+
+  // Email preferences (#22). A missing row is the common case (lazily created
+  // on first change) — maybeSingle() returns null without erroring.
+  const { data: pref } = await supabase
+    .from("mlb_user_preferences")
+    .select("notifications_paused_until")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const pausedUntil = pref?.notifications_paused_until ?? null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -109,6 +119,17 @@ export default async function DashboardPage() {
             )}
 
             <TeamGrid teams={MLB_TEAMS} followedIds={[...followedIds]} />
+
+            <div className="mt-16 border-t border-[#1f3a2c] pt-8">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-[#a8a299]">
+                Email preferences
+              </h2>
+              <p className="mt-2 max-w-prose text-sm text-[#a8a299]">
+                Need a break? Pause recap emails without unsubscribing or
+                removing teams — the teams you follow stay exactly as they are.
+              </p>
+              <PauseControl pausedUntil={pausedUntil} />
+            </div>
 
             <div className="mt-16 border-t border-[#1f3a2c] pt-8">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-[#a8a299]">

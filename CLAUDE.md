@@ -68,7 +68,9 @@ Any failure exits non-zero so the operator notices on the next prompt.
   - `api/cron/` — Main cron worker (every 15 min). Early-returns when `mlb_cron_schedule` has no expected_finish_at within (now-2.5h, now+30m); otherwise checks for completed games and sends emails. Logs each non-skipped run to `mlb_cron_runs`. See #76.
   - `api/cron/schedule/` — Daily 9am ET scheduler. Pulls today's MLB slate, writes one wake per game (`first_pitch + 3.5h`) into `mlb_cron_schedule`, prunes rows older than 36h.
   - `api/unsubscribe/` — Unsubscribe API
-  - `dashboard/` — Team selection UI
+  - `api/pause/` — Pause-recaps API (no-login, token = user id; see "Email preferences: pause" below)
+  - `pause/` — Confirmation page for the email-footer "Pause for 7 days" link
+  - `dashboard/` — Team selection UI + email-preferences (pause) control
   - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs. Also exposes break-glass "Run daily scheduler now" / "Run main cron now" buttons (#110) — see "Break-glass recovery" below
   - `login/` — Magic link auth
 - `lib/` — Shared utilities
@@ -410,6 +412,48 @@ A one-time welcome email fires the first time a user adds a team in `/dashboard`
 Idempotency uses a sentinel row in `mlb_sent_notifications` with `game_pk = 0` (no schema change). The helper does claim-then-send: insert the sentinel first, then send. If the insert fails with Postgres `23505` (unique violation), a previous call already won and we skip. If `sendEmail` throws, the sentinel is rolled back so a retry can succeed. This makes "remove all teams, re-add" a no-op — the sentinel persists.
 
 The email template is `buildWelcomeEmailHtml` in `lib/email-template.js`. Same 520px card layout as the recap email but with a brand-green accent (no team color, since there's no team), three "how it works" bullets, and a CTA back to `/dashboard`.
+
+## Email preferences: pause (#22)
+
+First slice of email preferences — a switch to pause recap emails **without**
+unsubscribing or removing teams. State lives in one new table,
+`mlb_user_preferences` (one row per user, `user_id` PK, nullable
+`notifications_paused_until timestamptz`). The row is created lazily — a user
+who never touches the setting has no row.
+
+`runMainCron` (`lib/cron-jobs.js`) batches one extra query against
+`mlb_user_preferences` (`.in(candidateUserIds).gt("notifications_paused_until", now)`)
+and skips any returned user in the fan-out loop with
+`skipped.reason = "notifications_paused"`. The `.gt()` filter does the
+time comparison server-side, so NULL and expired pauses come back as "active"
+for free. On a read error the cron **falls open** (sends) rather than dropping
+everyone's email over a transient blip — same stance as the schedule read.
+
+Two ways to pause:
+
+- **Dashboard** — `app/dashboard/pause-control.js`, a three-way control
+  (Active / Pause for 7 days / Pause indefinitely) under the "Email
+  preferences" section. Writes `mlb_user_preferences` via the browser Supabase
+  client (RLS: users read/write only their own row).
+- **Email footer link** — every recap email carries a "Pause for 7 days" link
+  next to "Unsubscribe", pointing at `/pause?token={userId}`. The `/pause`
+  page POSTs to `/api/pause`, which upserts `now()+7d` via the service-role
+  client — no login required, mirroring the `/api/unsubscribe` token pattern.
+
+`lib/preferences.js` holds the shared logic: `PAUSE_INDEFINITELY` (a
+far-future sentinel — "indefinite" is anything >1y out, robust to Postgres
+timestamptz reformatting), `sevenDayPauseUntil()`, and `pauseState()`
+(maps a stored value to `"active" | "timed" | "indefinite"` for the dashboard).
+
+Re-enabling never replays missed emails — `mlb_sent_notifications` already
+gates that. A pause that lapses (timestamp passes) is silently "active" again.
+
+> **One-time setup:** `mlb_user_preferences` is a new table — run the
+> `create table public.mlb_user_preferences ...` block from
+> `supabase-schema.sql` in the Supabase SQL editor against production (and
+> staging, if provisioned). Until it exists the cron's pause query errors and
+> falls open, so nothing breaks — paused users just keep receiving email until
+> the table is created.
 
 ## Supabase schema conventions
 
