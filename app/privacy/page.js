@@ -112,15 +112,31 @@ export default function PrivacyPage() {
               account in place.
             </p>
             <p className="mt-3">
-              To delete your account and all associated data, email{" "}
+              To delete your account and everything tied to it, open your{" "}
+              <Link
+                href="/dashboard"
+                className="text-[#f7f5ef] underline hover:text-[#b8312f] transition"
+              >
+                dashboard
+              </Link>{" "}
+              and use the <strong className="text-[#f7f5ef]">Delete account</strong>{" "}
+              option under Account. It removes your email address, the teams you
+              follow, and your recap history immediately, and we email you a
+              confirmation. The deletion is permanent and can&apos;t be undone.
+            </p>
+            <p className="mt-3">
+              Deleted data is also purged from our database provider&apos;s
+              automated backups, which are retained for up to 7 days for
+              disaster recovery. After that window passes, no copy of your data
+              remains. If you&apos;d rather not use the dashboard, email{" "}
               <a
                 href="mailto:highlights@ninthinning.email?subject=Delete%20my%20account"
                 className="text-[#f7f5ef] underline hover:text-[#b8312f] transition"
               >
                 highlights@ninthinning.email
               </a>{" "}
-              from the address you signed up with. We'll confirm and delete
-              within 7 days. Self-serve account deletion is on the roadmap.
+              from the address you signed up with and we&apos;ll handle it for
+              you.
             </p>
           </section>
 
