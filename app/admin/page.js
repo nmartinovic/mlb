@@ -5,6 +5,10 @@ import BreakGlass from "./break-glass";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  robots: { index: false },
+};
+
 const STATUS_COLORS = {
   success: "text-green-400",
   partial: "text-yellow-400",

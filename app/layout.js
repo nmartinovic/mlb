@@ -11,7 +11,6 @@ export const metadata = {
   description:
     "Spoiler-free MLB game recap videos delivered to your inbox the morning after. No scores, no spoilers — just the highlights.",
   keywords: ["MLB", "baseball", "highlights", "spoiler-free", "recap", "email"],
-  alternates: { canonical: "/" },
   openGraph: {
     title: "Ninth Inning Email — Spoiler-Free MLB Game Recaps",
     description:
