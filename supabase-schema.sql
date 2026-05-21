@@ -64,6 +64,35 @@ create policy "Users can view their own MLB notifications"
   on public.mlb_sent_notifications for select
   using (auth.uid() = user_id);
 
+-- User email preferences (#22). One row per user, created lazily the first
+-- time the user changes a preference (dashboard) or pauses via an email
+-- footer link. notifications_paused_until gates recap sends in the main cron:
+--   NULL or <= now()  -> active: recaps send normally
+--   > now()           -> paused: runMainCron skips this user
+-- "Pause for 7 days" stores now()+7d; "Pause indefinitely" stores a
+-- far-future sentinel. See lib/preferences.js.
+create table public.mlb_user_preferences (
+  user_id uuid references auth.users(id) on delete cascade primary key,
+  notifications_paused_until timestamptz,
+  updated_at timestamptz default now() not null
+);
+
+alter table public.mlb_user_preferences enable row level security;
+
+-- Users can read and write only their own preferences row. The main cron
+-- reads this table via service_role, which bypasses RLS.
+create policy "Users can view their own preferences"
+  on public.mlb_user_preferences for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own preferences"
+  on public.mlb_user_preferences for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own preferences"
+  on public.mlb_user_preferences for update
+  using (auth.uid() = user_id);
+
 -- Create a view to join mlb_user_teams with auth.users for the cron worker
 -- (The cron worker uses the service role key which bypasses RLS)
 create view public.mlb_users as
