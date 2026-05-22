@@ -70,6 +70,7 @@ Any failure exits non-zero so the operator notices on the next prompt.
   - `api/unsubscribe/` — Unsubscribe API
   - `api/pause/` — Pause-recaps API (no-login, token = user id; see "Email preferences: pause" below)
   - `pause/` — Confirmation page for the email-footer "Pause for 7 days" link
+  - `highlights/[gamePk]/` — Branded interstitial the recap-email "Watch Highlights" CTA links to (#77); embeds the MLB highlight in our chrome. See "Branded highlights page" below
   - `dashboard/` — Team selection UI + email-preferences (pause) control
   - `admin/` — Owner-only health dashboard (gated by `ADMIN_EMAIL` via `notFound()`); shows total users, emails sent in the last 7 days, and recent cron runs. Also exposes break-glass "Run daily scheduler now" / "Run main cron now" buttons (#110) — see "Break-glass recovery" below
   - `login/` — Magic link auth
@@ -402,8 +403,44 @@ Events currently captured:
 | `signup_completed` | `app/dashboard/signup-tracker.js` | The auth callback (`app/auth/callback/route.js`) appends `?signup=1` when `auth.users.created_at` is < 5 min old; the dashboard tracker fires once and strips the param via `router.replace` so a refresh doesn't double-count |
 | `team_selected` / `team_deselected` | `app/dashboard/team-grid.js` | Includes `team_id` in props; fired after the Supabase write resolves |
 | `unsubscribe_clicked` | `app/unsubscribe/page.js` | Anonymous (no user session), but PostHog distinct_id persists across visits |
+| `highlights_page_viewed` | `app/highlights/[gamePk]/view-tracker.js` | Fired once on mount of the branded highlights page (#77); props carry `game_pk` and `team_id`. Often anonymous — most visits arrive from an email link |
 
 Autocapture and session recording are disabled — only the explicit events above. Pageviews and pageleaves are captured automatically by PostHog. To add a new event, import `track` from `@/lib/analytics` and call it from a `"use client"` component.
+
+## Branded highlights page (#77)
+
+The recap email's "Watch Highlights" CTA no longer links straight to MLB.com.
+It points at `app/highlights/[gamePk]/page.js` — a branded interstitial on
+`ninthinning.email` that wraps the highlight in our chrome, so the
+highest-intent click in the funnel lands on a page we own and can instrument.
+
+- **Public, no auth.** Matches the email-link UX — anyone with the link can
+  view it. Reads `mlb_game_cache` (RLS: publicly readable) for the game.
+- **Data source.** Keyed only on `game_pk`. The cron always writes a
+  `mlb_game_cache` row for every game it emails about, so the row is the
+  source of truth. An unknown `game_pk` (or a non-numeric path segment)
+  `notFound()`s. If the cached `highlight_url` is null (cron cached the row
+  before MLB published a recap) the page makes one live `fetchGameContent` +
+  `extractHighlightUrl` retry; still-missing degrades to a "not posted yet"
+  state, never a broken player.
+- **Player.** When `highlight_url` is a direct `.mp4` (the common case —
+  `pickPlaybackUrl` in `lib/mlb.js` prefers `mp4Avc`/`2500K` playbacks) it
+  renders a native `<video controls preload="metadata">`. Non-mp4 URLs (e.g.
+  HLS) fall back to a branded "Watch the recap" handoff button. There is no
+  third-party MLB player embed.
+- **Spoiler-safe context.** Title is `{Team} highlights` + the long-form
+  date; an opponent line (`vs/@ {Opponent} · Game X of Y`) is derived
+  best-effort from a `fetchSchedule` call and `extractSeriesContext` — any
+  failure just omits the line. No score, win/loss, or play-by-play anywhere.
+- **CTA wiring.** `recapCtaUrl()` in `lib/email-template.js` builds
+  `{SITE_URL}/highlights/{gamePk}` (with the standard recap UTM params) for
+  both `buildEmailHtml` and the multi-game `renderGameCard`. `gamePk` is
+  threaded in from `lib/cron-jobs.js` and `lib/resend-recap.js`. When no
+  `gamePk` is supplied the CTA falls back to the raw highlight URL.
+- **Analytics.** `highlights_page_viewed` fires from the `view-tracker.js`
+  client island (see the product-analytics table above).
+- Per-game pages are `robots: { index: false }` and excluded from the
+  sitemap — no SEO value, and they expose internal game PKs.
 
 ## Welcome email (#26)
 

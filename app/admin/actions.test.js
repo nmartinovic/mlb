@@ -194,7 +194,8 @@ describe("resendLatestRecapAction", () => {
     expect(subject.startsWith("[TEST] ")).toBe(true);
     expect(subject).toContain("New York Yankees Highlights");
     expect(html).toContain("New York Yankees");
-    expect(html).toContain("https://mlb.com/video/yankees-recap");
+    // The recap CTA routes through our branded highlights page (#77).
+    expect(html).toContain(`/highlights/${gamePk}`);
   });
 
   it("is blocked when EMAILS_PAUSED is set", async () => {
