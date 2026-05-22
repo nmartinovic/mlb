@@ -1,0 +1,39 @@
+name: Cron backup
+
+# Standby backstop for the Cloudflare Cron Triggers (see CLAUDE.md and
+# INCIDENT.md — added after the 2026-05-22 Cloudflare cron outage).
+#
+# Cloudflare's Cron Triggers stay the PRIMARY scheduler. This workflow hits the
+# cron HTTP routes every 15 min with ?backup=1; each route checks mlb_cron_runs
+# first and returns "Backup skipped" while Cloudflare's cron is healthy, so it
+# only does real work during a Cloudflare cron outage.
+#
+# Requires the CRON_SECRET repository secret (Settings > Secrets and variables
+# > Actions). GitHub-scheduled runs can be delayed several minutes under load —
+# fine for a backstop, given the cron's generous wake window.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  backup-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Main cron (no-op unless Cloudflare cron is stale)
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 --max-time 70 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -w '\nHTTP %{http_code}\n' \
+            "https://ninthinning.email/api/cron?backup=1"
+
+      - name: Daily scheduler (no-op unless scheduler is stale)
+        if: ${{ !cancelled() }}
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 --max-time 40 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -w '\nHTTP %{http_code}\n' \
+            "https://ninthinning.email/api/cron/schedule?backup=1"

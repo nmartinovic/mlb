@@ -34,6 +34,8 @@ function makeSupabaseMock({
   scheduleError = null,
   anyRows = [{ game_pk: 1 }],
   anyError = null,
+  lastRunRows = [],
+  lastRunError = null,
 } = {}) {
   const inserted = [];
   const updates = [];
@@ -50,6 +52,12 @@ function makeSupabaseMock({
       }),
     }),
     mlb_cron_runs: () => ({
+      // Freshness query used by the ?backup=1 gate (cronRanRecently).
+      select: () => ({
+        order: () => ({
+          limit: async () => ({ data: lastRunRows, error: lastRunError }),
+        }),
+      }),
       insert: (row) => {
         inserted.push(row);
         return {
@@ -89,8 +97,11 @@ function makeSupabaseMock({
   return { client, inserted, updates };
 }
 
-function makeRequest({ auth = "Bearer secret" } = {}) {
-  return new Request("https://ninthinning.email/api/cron", {
+function makeRequest({ auth = "Bearer secret", backup = false } = {}) {
+  const url = backup
+    ? "https://ninthinning.email/api/cron?backup=1"
+    : "https://ninthinning.email/api/cron";
+  return new Request(url, {
     headers: auth ? { Authorization: auth } : {},
   });
 }
@@ -287,5 +298,81 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     for (const call of fromMock.mock.calls) {
       expect(call[0]).toBe("mlb_cron_runs");
     }
+  });
+});
+
+describe("GET /api/cron?backup=1 — GitHub Actions backup gate", () => {
+  it("skips without running the cron when Cloudflare's cron ran recently", async () => {
+    const { client, inserted } = makeSupabaseMock({
+      lastRunRows: [
+        { started_at: new Date(Date.now() - 5 * 60 * 1000).toISOString() },
+      ],
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      message: "Backup skipped — Cloudflare cron is healthy",
+    });
+    // runMainCron never ran — startRun would have inserted a row.
+    expect(inserted).toEqual([]);
+  });
+
+  it("runs the cron when the last mlb_cron_runs row is stale", async () => {
+    const { client, inserted } = makeSupabaseMock({
+      lastRunRows: [
+        { started_at: new Date(Date.now() - 40 * 60 * 1000).toISOString() },
+      ],
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    // Fell through to runMainCron — heartbeat path writes the running row.
+    expect(inserted).toEqual([{ status: "running" }]);
+  });
+
+  it("runs the cron when there is no prior run row at all", async () => {
+    const { client, inserted } = makeSupabaseMock({ lastRunRows: [] });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(inserted).toEqual([{ status: "running" }]);
+  });
+
+  it("falls open and runs the cron when the freshness check errors", async () => {
+    const { client, inserted } = makeSupabaseMock({
+      lastRunRows: null,
+      lastRunError: { message: "boom" },
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(inserted).toEqual([{ status: "running" }]);
+  });
+
+  it("ignores the freshness gate for non-backup requests", async () => {
+    // A run just happened, but without ?backup=1 the route runs anyway.
+    const { client, inserted } = makeSupabaseMock({
+      lastRunRows: [{ started_at: new Date().toISOString() }],
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(inserted).toEqual([{ status: "running" }]);
   });
 });

@@ -271,6 +271,19 @@ Failure modes worth knowing:
 
 `mlb_cron_runs` statuses to expect from this stack: `running`, `success`, `partial`, `failure`, `paused`, `no_subscribers`, `no_new_highlights`, `skipped_no_wake`, `dry_run` (main cron) and `schedule_running`, `schedule_built`, `schedule_partial`, `schedule_failure` (scheduler). `dry_run` (#180) marks a `runMainCron({ dryRun: true })` invocation — the full pipeline ran but the Brevo send and `mlb_sent_notifications` insert were skipped; treat such rows as diagnostic, not real sends. Per postmortem #103 / #104, every `*/15` tick now writes exactly one row — silence is treated as a failure mode, so an empty `mlb_cron_runs` hour means the cron itself isn't running and should page, not "no game in window."
 
+### GitHub Actions backup cron
+
+Cloudflare Cron Triggers are the **primary** scheduler. `.github/workflows/cron-backup.yml` is a standby backstop, added after the 2026-05-22 Cloudflare cron outage (see `INCIDENT.md`) when Cloudflare silently stopped dispatching `scheduled()` events to the worker for hours despite registered triggers and a valid handler.
+
+Every 15 min the workflow calls `/api/cron?backup=1` and `/api/cron/schedule?backup=1`. The `?backup=1` flag makes each route call `cronRanRecently()` (`lib/cron-backup.js`) against `mlb_cron_runs` **before** doing any work:
+
+- `/api/cron` skips if any row landed in the last 25 min (Cloudflare's `*/15` cron is alive).
+- `/api/cron/schedule` skips if a `schedule_*` row landed in the last 25h (Cloudflare ran today's scheduler).
+
+So while Cloudflare's cron is healthy the backup is a pure no-op — one Supabase read, no double-execution. It only runs the real job once Cloudflare's cron has gone silent. Because the backup's own runs also write `mlb_cron_runs` rows, during a Cloudflare outage it self-paces to roughly every 30 min — well within the asymmetric wake window, so no recap is missed. On a freshness-query error it falls open (runs), same stance as the schedule read. `mlb_sent_notifications` dedup makes any overlap with a recovering Cloudflare cron harmless.
+
+Requires the **`CRON_SECRET`** GitHub Actions repository secret (Settings → Secrets and variables → Actions) — the routes authenticate the same bearer token as manual curl recovery. GitHub-scheduled runs can lag several minutes under load; fine for a backstop. The non-`backup` path of both routes (manual curl, no `?backup=1`) is unchanged and always runs.
+
 ## Break-glass recovery (#110)
 
 When you need to manually kick the cron — e.g. the daily scheduler missed a tick, or a *every-15-min run silently early-returned during a deploy window — the primary recovery path is the **/admin** page, not curl + bearer token.
