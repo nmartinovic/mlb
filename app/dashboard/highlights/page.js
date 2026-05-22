@@ -3,7 +3,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { TEAMS_BY_ID } from "@/lib/teams";
 import { formatDisplayDate } from "@/lib/mlb";
+import { buildHighlightHistory } from "@/lib/highlight-history";
 import { BrandLockup } from "@/components/brand";
+
+// How many past recaps to list. mlb_sent_notifications holds one row per
+// game we emailed the user about, so this is a hard cap on the page length.
+const MAX_HISTORY = 50;
 
 export default async function HighlightsPage() {
   const supabase = await createClient();
@@ -18,23 +23,32 @@ export default async function HighlightsPage() {
     .select("team_id")
     .eq("user_id", user.id);
 
-  const followedTeamIds = (userTeams || []).map((r) => r.team_id);
+  const followedCount = (userTeams || []).length;
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 14);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Source of truth is the recaps we actually sent (mlb_sent_notifications),
+  // not every game the followed teams played — so a recap still shows here
+  // even after the user unfollows that team. game_pk = 0 is the welcome
+  // sentinel (#26); exclude it at the query so it never counts toward MAX_HISTORY.
+  const { data: sentRows } = await supabase
+    .from("mlb_sent_notifications")
+    .select("game_pk, sent_at")
+    .eq("user_id", user.id)
+    .neq("game_pk", 0)
+    .order("sent_at", { ascending: false })
+    .limit(MAX_HISTORY);
 
-  let highlights = [];
-  if (followedTeamIds.length > 0) {
-    const { data } = await supabase
+  // mlb_sent_notifications has no FK to mlb_game_cache, so PostgREST can't
+  // embed the join — fetch the matching cache rows and merge in JS.
+  let history = [];
+  if (sentRows && sentRows.length > 0) {
+    const { data: gameCacheRows } = await supabase
       .from("mlb_game_cache")
       .select("game_pk, team_id, game_date, highlight_url")
-      .in("team_id", followedTeamIds)
-      .not("highlight_url", "is", null)
-      .gte("game_date", cutoffStr)
-      .order("game_date", { ascending: false })
-      .limit(50);
-    highlights = data || [];
+      .in(
+        "game_pk",
+        sentRows.map((r) => r.game_pk),
+      );
+    history = buildHighlightHistory(sentRows, gameCacheRows);
   }
 
   return (
@@ -60,54 +74,54 @@ export default async function HighlightsPage() {
           Highlights
         </h1>
         <p className="mt-2 text-[#a8a299]">
-          Recent game recaps for your followed teams (last 14 days).
+          The spoiler-free recaps we&apos;ve emailed you — re-watch any of them
+          here.
         </p>
 
         <div className="mt-10">
-          {followedTeamIds.length === 0 ? (
+          {followedCount === 0 ? (
             <EmptyState
               title="No teams followed yet"
               body="Pick a team and we'll start dropping recaps here as soon as they play."
               cta={{ href: "/dashboard", label: "Choose your teams" }}
             />
-          ) : highlights.length === 0 ? (
+          ) : history.length === 0 ? (
             <EmptyState
               title="No recaps yet"
-              body="Recaps appear here within a few hours of the final out. Check back after your team's next game."
+              body="Your first recap will land after your team's next game finishes."
             />
           ) : (
-            <div className="space-y-3">
-              {highlights.map((game) => {
-                const team = TEAMS_BY_ID[game.team_id];
+            <ul className="space-y-3">
+              {history.map((game) => {
+                const team = TEAMS_BY_ID[game.teamId];
                 return (
-                  <a
-                    key={game.game_pk}
-                    href={game.highlight_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded-lg border border-[#1f3a2c] bg-[#0f2a1f]/40 px-5 py-4 transition hover:border-[#4a7a5b] hover:bg-[#0f2a1f]/60"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-1 self-stretch rounded-full"
-                        style={{ backgroundColor: team?.color || "#3f6e57" }}
-                      />
-                      <div>
-                        <div className="text-sm font-medium text-[#f7f5ef]">
-                          {team?.name || `Team ${game.team_id}`}
-                        </div>
-                        <div className="mt-0.5 text-xs text-[#a8a299]">
-                          {formatDisplayDate(game.game_date)}
+                  <li key={game.gamePk}>
+                    <Link
+                      href={`/highlights/${game.gamePk}`}
+                      className="group flex items-center justify-between rounded-lg border border-[#1f3a2c] bg-[#0f2a1f]/40 px-5 py-4 transition hover:border-[#4a7a5b] hover:bg-[#0f2a1f]/60"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className="w-1 self-stretch rounded-full"
+                          style={{ backgroundColor: team?.color || "#3f6e57" }}
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-[#f7f5ef]">
+                            {team?.name || `Team ${game.teamId}`}
+                          </div>
+                          <div className="mt-0.5 text-xs text-[#a8a299]">
+                            {formatDisplayDate(game.gameDate)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <span className="shrink-0 text-xs font-medium text-[#a8a299] transition group-hover:text-[#f7f5ef]">
-                      Watch recap →
-                    </span>
-                  </a>
+                      <span className="shrink-0 text-xs font-medium text-[#a8a299] transition group-hover:text-[#f7f5ef]">
+                        Watch recap →
+                      </span>
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
         </div>
       </main>
