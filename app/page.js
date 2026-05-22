@@ -13,7 +13,8 @@ const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-emai
 // Use an offseason or old game so any score shown is irrelevant to current
 // subscribers. MLB CDN links can rotate — update this when it expires.
 // Example format: "https://mlb-cuts-diamond.mlb.com/MLBHLV/.../recap.mp4"
-const SAMPLE_RECAP_URL = "";
+const SAMPLE_RECAP_URL =
+  "https://mlb-cuts-diamond.mlb.com/FORGE/2026/2026-05/04/dfb4c489-3c819900-623b63f0-csvm-diamondgcp-asset_1280x720_59_4000K.mp4";
 // Optional poster image (prevents layout shift while video loads). Set to
 // a path in /public or an absolute URL alongside SAMPLE_RECAP_URL.
 const SAMPLE_RECAP_POSTER = "";
