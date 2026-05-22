@@ -9,6 +9,15 @@ export const metadata = {
 
 const PREVIEW_TEAM_ID = 119; // Dodgers — matches default in app/api/test-email/route.js
 
+// Set to a real MLB CDN .mp4 URL to enable the in-page video example.
+// Use an offseason or old game so any score shown is irrelevant to current
+// subscribers. MLB CDN links can rotate — update this when it expires.
+// Example format: "https://mlb-cuts-diamond.mlb.com/MLBHLV/.../recap.mp4"
+const SAMPLE_RECAP_URL = "";
+// Optional poster image (prevents layout shift while video loads). Set to
+// a path in /public or an absolute URL alongside SAMPLE_RECAP_URL.
+const SAMPLE_RECAP_POSTER = "";
+
 function EmailPreview({ size = "sm", showInboxRow = false }) {
   const team = TEAMS_BY_ID[PREVIEW_TEAM_ID];
   const lastName = team.name.split(" ").slice(-1)[0];
@@ -126,6 +135,51 @@ function Stat({ value, label }) {
   );
 }
 
+function SampleVideoPlayer() {
+  const isMp4 =
+    typeof SAMPLE_RECAP_URL === "string" &&
+    SAMPLE_RECAP_URL.length > 0 &&
+    /\.mp4(\?|$)/i.test(SAMPLE_RECAP_URL);
+
+  return (
+    <div className="mx-auto mt-10 max-w-2xl">
+      <p className="mb-4 text-center text-sm text-[#a8a299]">
+        Here&apos;s an example of what you&apos;ll watch:
+      </p>
+      <div className="overflow-hidden rounded-xl border border-[#1f3a2c]">
+        <div className="h-1.5 bg-[#2d5a3d]" aria-hidden="true" />
+        {isMp4 ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            poster={SAMPLE_RECAP_POSTER || undefined}
+            className="block aspect-video w-full bg-black"
+          >
+            <source src={SAMPLE_RECAP_URL} type="video/mp4" />
+          </video>
+        ) : (
+          <div className="flex aspect-video w-full items-center justify-center bg-black/80">
+            <div className="text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1f3a2c] ring-1 ring-[#3f6e57]">
+                <span className="ml-1 text-2xl text-[#f7f5ef]">&#9654;</span>
+              </div>
+              <p className="mt-4 text-sm font-medium text-[#f7f5ef]">
+                Official MLB game recap
+              </p>
+              <p className="mt-1 text-xs text-[#a8a299]">3–5 minutes</p>
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="mt-2 text-center text-xs text-[#a8a299]">
+        3–5 minute official MLB game recap — spoiler-free until you press play
+      </p>
+    </div>
+  );
+}
+
 function FaqItem({ q, children }) {
   return (
     <details className="group rounded-xl border border-[#1f3a2c] bg-[#0f2a1f]/40 px-5 py-4 open:bg-[#0f2a1f]/60">
@@ -187,8 +241,8 @@ export default async function Home() {
                 Spoiler-free MLB recaps in your inbox.
               </h1>
               <p className="mt-5 text-lg text-[#a8a299] sm:text-xl">
-                Pick your teams. We email the recap the next morning — no
-                score in sight.
+                Pick your teams. We deliver a 3–5 minute official MLB recap
+                the next morning — spoiler-free until you press play.
               </p>
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
@@ -201,7 +255,7 @@ export default async function Home() {
                   href="#sample"
                   className="text-sm font-medium text-[#a8a299] hover:text-[#f7f5ef] transition"
                 >
-                  See a sample email &rarr;
+                  See a sample email &amp; recap &rarr;
                 </a>
               </div>
               <p className="mt-4 text-xs text-[#a8a299]">
@@ -248,7 +302,7 @@ export default async function Home() {
           <StepCard
             n="3"
             title="Watch the game (or don't)"
-            body="3–5 minutes of highlights from MLB.com. No scores in the subject line, no spoilers in the email."
+            body="A 3–5 minute official MLB game recap, on a page we host. The email and subject are spoiler-free — you decide when to press play."
           />
         </div>
       </section>
@@ -258,15 +312,17 @@ export default async function Home() {
         <div className="mx-auto max-w-4xl px-6 py-20">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-[#f7f5ef] sm:text-4xl">
-              Here's what lands in your inbox
+              Here&apos;s what lands in your inbox
             </h2>
             <p className="mt-3 text-[#a8a299]">
-              Just the link. No score, no spoiler, no clickbait.
+              One link. No score, no spoilers — just a 3–5 minute official
+              MLB recap waiting for when you&apos;re ready.
             </p>
           </div>
           <div className="mt-12">
             <EmailPreview size="lg" showInboxRow />
           </div>
+          <SampleVideoPlayer />
         </div>
       </section>
 
@@ -306,10 +362,18 @@ export default async function Home() {
             to gate anything behind a paywall. There&apos;s a tip link if you
             want to chip in for hosting &mdash; that&apos;s it.
           </FaqItem>
+          <FaqItem q="What exactly do I get to watch?">
+            A 3–5 minute official MLB game recap, hosted on a page we own.
+            Every game MLB publishes a highlight video for — regular season,
+            playoffs, World Series — gets a recap. The video itself shows
+            the full game story (including the score); the
+            spoiler-free part is the email and the delivery, so you can
+            choose exactly when you watch.
+          </FaqItem>
           <FaqItem q="Will I see the score by accident?">
-            No. The email subject and body are written to be spoiler-free —
-            no scores, no outcomes, no who-won-what. The link sends you to
-            the official MLB.com video page for the recap.
+            No. The email subject and body are spoiler-free — no scores, no
+            outcomes, no who-won-what. The link opens a page we host; the
+            score isn&apos;t shown until you choose to press play.
           </FaqItem>
           <FaqItem q="Can I follow more than one team?">
             Yes &mdash; follow as many of the 30 MLB teams as you want.
