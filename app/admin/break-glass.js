@@ -131,12 +131,15 @@ function DryRunReport({ report }) {
   }
 
   const gameCount = new Set(report.map((r) => r.gamePk)).size;
+  // The report keeps one row per game; emails are batched per recipient (#27),
+  // so the email count is the number of distinct recipients, not report.length.
+  const emailCount = new Set(report.map((r) => r.userId)).size;
 
   return (
     <div className="mt-3">
       <p className="mb-2 text-gray-300">
-        {report.length} email{report.length === 1 ? "" : "s"} would be sent
-        across {gameCount} game{gameCount === 1 ? "" : "s"}.
+        {emailCount} email{emailCount === 1 ? "" : "s"} would be sent across{" "}
+        {gameCount} game{gameCount === 1 ? "" : "s"}.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-left font-mono">

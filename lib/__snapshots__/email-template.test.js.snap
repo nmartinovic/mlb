@@ -1,0 +1,141 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildMultiGameEmailHtml (#27) > matches the multi-game email snapshot 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your game recaps</title>
+</head>
+<body style="margin:0;padding:0;background-color:#efece4;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#efece4;">
+<tr><td align="center" style="padding:24px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#f7f5ef;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+
+  <!-- Brand accent bar -->
+  <tr><td style="height:6px;background-color:#2d5a3d;"></td></tr>
+
+  <!-- Wordmark + date -->
+  <tr><td style="padding:24px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td><span style="font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-weight:500;font-size:14px;letter-spacing:-0.015em;color:#1a1d1c;white-space:nowrap;">ninthinning<span style="color:#2d5a3d;margin:0 1px;">&#9670;</span>email</span></td>
+        <td align="right" style="color:#71717a;font-size:12px;font-family:'JetBrains Mono','SF Mono',Menlo,monospace;letter-spacing:0.06em;text-transform:uppercase;">May 18, 2026</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Title -->
+  <tr><td style="padding:14px 32px 0 32px;">
+    <h1 style="margin:0;font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:24px;font-weight:600;color:#1a1d1c;line-height:1.3;letter-spacing:-0.02em;">Your game recaps are ready</h1>
+    <p style="margin:8px 0 0 0;font-size:15px;color:#52525b;line-height:1.5;">2 spoiler-free recaps from your teams are waiting for you.</p>
+  </td></tr>
+
+  
+  <!-- Game card: New York Yankees -->
+  <tr><td style="padding:18px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;">
+      <tr><td style="height:5px;background-color:#003087;"></td></tr>
+      <tr><td style="padding:16px 18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td><span style="display:inline-block;background-color:#003087;color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:4px;">NYY</span></td>
+            <td align="right" style="color:#71717a;font-size:11px;font-family:'JetBrains Mono','SF Mono',Menlo,monospace;letter-spacing:0.06em;text-transform:uppercase;">May 18, 2026</td>
+          </tr>
+        </table>
+        <h2 style="margin:12px 0 0 0;font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;font-weight:600;color:#1a1d1c;line-height:1.3;letter-spacing:-0.02em;">New York Yankees highlights</h2>
+        <p style="margin:12px 0 0 0;font-size:13px;font-weight:600;letter-spacing:0.04em;color:#71717a;text-transform:uppercase;">vs Red Sox &mdash; Game 2 of 3</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr><td align="center" style="padding-top:16px;">
+            <a href="https://www.mlb.com/video/yankees-recap?utm_source=ninthinning&utm_medium=email&utm_campaign=recap" style="display:inline-block;background-color:#003087;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;letter-spacing:0.3px;">Watch Highlights &#9654;</a>
+          </td></tr>
+          <tr><td align="center" style="padding-top:8px;font-size:12px;color:#a1a1aa;">
+            Video: <a href="https://www.mlb.com" style="color:#a1a1aa;">MLB.com</a>
+          </td></tr>
+        </table>
+        <div style="margin-top:14px;border-left:3px solid #003087;padding:8px 12px;background-color:rgba(0,0,0,0.02);border-radius:0 4px 4px 0;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:#71717a;text-transform:uppercase;margin-bottom:4px;">Standings entering today</div>
+          <div style="font-size:14px;color:#3f3f46;">AL East &middot; <strong>1st</strong> &middot; 28&ndash;16</div>
+          
+        </div>
+      </td></tr>
+    </table>
+  </td></tr>
+  <!-- Game card: Los Angeles Dodgers -->
+  <tr><td style="padding:18px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;">
+      <tr><td style="height:5px;background-color:#005A9C;"></td></tr>
+      <tr><td style="padding:16px 18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td><span style="display:inline-block;background-color:#005A9C;color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:4px;">LAD</span></td>
+            <td align="right" style="color:#71717a;font-size:11px;font-family:'JetBrains Mono','SF Mono',Menlo,monospace;letter-spacing:0.06em;text-transform:uppercase;">May 18, 2026</td>
+          </tr>
+        </table>
+        <h2 style="margin:12px 0 0 0;font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;font-weight:600;color:#1a1d1c;line-height:1.3;letter-spacing:-0.02em;">Los Angeles Dodgers highlights</h2>
+        <p style="margin:12px 0 0 0;font-size:13px;font-weight:600;letter-spacing:0.04em;color:#71717a;text-transform:uppercase;">@ Giants &mdash; Game 1 of 3</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr><td align="center" style="padding-top:16px;">
+            <a href="https://www.mlb.com/video/dodgers-recap?utm_source=ninthinning&utm_medium=email&utm_campaign=recap" style="display:inline-block;background-color:#005A9C;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;letter-spacing:0.3px;">Watch Highlights &#9654;</a>
+          </td></tr>
+          <tr><td align="center" style="padding-top:8px;font-size:12px;color:#a1a1aa;">
+            Video: <a href="https://www.mlb.com" style="color:#a1a1aa;">MLB.com</a>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+  <!-- Footer divider -->
+  <tr><td style="padding:32px 32px 0 32px;">
+    <hr style="margin:0;border:none;border-top:1px solid #e4e4e7;">
+  </td></tr>
+
+  
+  <!-- Tip prompt (#83: prominent card with button-styled CTA) -->
+  <tr><td style="padding:20px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border:1px solid #e4e4e7;border-left:3px solid #2d5a3d;border-radius:6px;">
+      <tr><td style="padding:16px 18px;">
+        <p style="margin:0 0 4px 0;font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:600;color:#1a1d1c;line-height:1.4;">Enjoying Ninth Inning Email?</p>
+        <p style="margin:0 0 12px 0;font-size:13px;color:#52525b;line-height:1.5;">Tips keep the servers running and the recaps free.</p>
+        <a href="https://buy.stripe.com/tip" style="display:inline-block;background-color:#2d5a3d;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:6px;letter-spacing:0.3px;">Tip the developer &#9829;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  
+
+  <!-- Forward prompt -->
+  <tr><td align="center" style="padding:16px 32px 0 32px;">
+    <p style="margin:0;font-size:13px;color:#52525b;line-height:1.5;">
+      Know a fan who&#39;d like this? Forward them this email or send them <a href="https://ninthinning.email" style="color:#2d5a3d;text-decoration:underline;font-weight:600;">ninthinning.email</a>.
+    </p>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:16px 32px 0 32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="font-size:13px;color:#a1a1aa;">
+          <span style="font-family:'General Sans','Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-weight:500;font-size:13px;letter-spacing:-0.015em;color:#52525b;white-space:nowrap;">ninthinning<span style="color:#2d5a3d;margin:0 1px;">&#9670;</span>email</span><br>
+          <span style="font-size:12px;color:#a1a1aa;">Spoiler-free MLB recaps</span>
+        </td>
+        <td align="right" style="font-size:12px;vertical-align:top;">
+          <a href="https://ninthinning.email/pause?token=user-123" style="color:#a1a1aa;text-decoration:underline;">Pause for 7 days</a>
+          <span style="color:#d4d4d8;">&nbsp;&middot;&nbsp;</span>
+          <a href="https://ninthinning.email/unsubscribe?token=user-123" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe</a>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Disclaimer -->
+  <tr><td style="padding:12px 32px 28px 32px;">
+    <p style="margin:0;font-size:11px;color:#a1a1aa;line-height:1.5;">Ninth Inning Email is not affiliated with, endorsed by, or sponsored by MLB or any MLB club. Questions or takedown requests: <a href="mailto:abuse@ninthinning.email" style="color:#a1a1aa;">abuse@ninthinning.email</a></p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
