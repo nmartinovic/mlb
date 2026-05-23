@@ -15,7 +15,12 @@ vi.mock("@/lib/mlb", async () => {
   };
 });
 
-function makeSupabaseMock({ upsertResult = { error: null }, deleteResult = { error: null } } = {}) {
+function makeSupabaseMock({
+  upsertResult = { error: null },
+  deleteResult = { error: null },
+  lastRunRows = [],
+  lastRunError = null,
+} = {}) {
   const insertedRuns = [];
   const upsertCalls = [];
   const deleteCalls = [];
@@ -25,6 +30,14 @@ function makeSupabaseMock({ upsertResult = { error: null }, deleteResult = { err
     from: vi.fn((table) => {
       if (table === "mlb_cron_runs") {
         return {
+          // Freshness query used by the ?backup=1 gate (cronRanRecently).
+          select: vi.fn(() => ({
+            like: () => ({
+              order: () => ({
+                limit: async () => ({ data: lastRunRows, error: lastRunError }),
+              }),
+            }),
+          })),
           insert: vi.fn((row) => {
             insertedRuns.push(row);
             return {
@@ -68,8 +81,11 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
 });
 
-function makeRequest({ auth = "Bearer secret" } = {}) {
-  return new Request("https://ninthinning.email/api/cron/schedule", {
+function makeRequest({ auth = "Bearer secret", backup = false } = {}) {
+  const url = backup
+    ? "https://ninthinning.email/api/cron/schedule?backup=1"
+    : "https://ninthinning.email/api/cron/schedule";
+  return new Request(url, {
     headers: auth ? { Authorization: auth } : {},
   });
 }
@@ -147,5 +163,72 @@ describe("GET /api/cron/schedule", () => {
     expect(res.status).toBe(500);
     expect(updates[0]).toMatchObject({ status: "schedule_failure" });
     expect(updates[0].errors_count).toBe(1);
+  });
+});
+
+describe("GET /api/cron/schedule?backup=1 — GitHub Actions backup gate", () => {
+  it("skips without running the scheduler when it ran recently", async () => {
+    const { client, insertedRuns, upsertCalls } = makeSupabaseMock({
+      lastRunRows: [
+        { started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+      ],
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      message: "Backup skipped — scheduler ran recently",
+    });
+    // runScheduler never ran.
+    expect(insertedRuns).toEqual([]);
+    expect(upsertCalls).toHaveLength(0);
+    expect(fetchDailySchedule).not.toHaveBeenCalled();
+  });
+
+  it("runs the scheduler when the last schedule_* row is stale", async () => {
+    const { client, insertedRuns, updates } = makeSupabaseMock({
+      lastRunRows: [
+        { started_at: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString() },
+      ],
+    });
+    createAdminClient.mockReturnValue(client);
+    fetchDailySchedule.mockResolvedValue({ dates: [] });
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(insertedRuns).toEqual([{ status: "schedule_running" }]);
+    expect(updates[0]).toMatchObject({ status: "schedule_built" });
+  });
+
+  it("runs the scheduler when there is no prior schedule_* row", async () => {
+    const { client, insertedRuns } = makeSupabaseMock({ lastRunRows: [] });
+    createAdminClient.mockReturnValue(client);
+    fetchDailySchedule.mockResolvedValue({ dates: [] });
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(insertedRuns).toEqual([{ status: "schedule_running" }]);
+  });
+
+  it("falls open and runs the scheduler when the freshness check errors", async () => {
+    const { client, insertedRuns } = makeSupabaseMock({
+      lastRunRows: null,
+      lastRunError: { message: "boom" },
+    });
+    createAdminClient.mockReturnValue(client);
+    fetchDailySchedule.mockResolvedValue({ dates: [] });
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest({ backup: true }));
+
+    expect(res.status).toBe(200);
+    expect(insertedRuns).toEqual([{ status: "schedule_running" }]);
   });
 });
