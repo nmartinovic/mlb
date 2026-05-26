@@ -8,6 +8,7 @@ import { BrandLockup } from "@/components/brand";
 function LoginForm() {
   const searchParams = useSearchParams();
   const isSignup = searchParams.get("next") === "signup";
+  const team = searchParams.get("team") || "";
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
@@ -23,7 +24,7 @@ function LoginForm() {
       res = await fetch("/api/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, team }),
       });
     } catch {
       setLoading(false);
