@@ -205,7 +205,9 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   const isSignedIn = Boolean(user);
   const ctaHref = isSignedIn ? "/dashboard" : "/login?next=signup";
-  const ctaLabel = isSignedIn ? "Manage my teams" : "Pick my teams";
+  const ctaLabel = isSignedIn
+    ? "Manage my teams"
+    : "Get my team's next spoiler-free recap";
 
   return (
     <div className="min-h-screen">
@@ -239,11 +241,12 @@ export default async function Home() {
                 Free · For MLB fans
               </span>
               <h1 className="mt-5 text-4xl font-bold tracking-tight text-[#f7f5ef] sm:text-5xl lg:text-6xl">
-                Spoiler-free MLB recaps in your inbox.
+                Watch last night&apos;s game without accidentally seeing the score.
               </h1>
               <p className="mt-5 text-lg text-[#a8a299] sm:text-xl">
-                Pick your teams. We deliver a 3–5 minute official MLB recap
-                the next morning — spoiler-free until you press play.
+                Pick your MLB teams. Every morning, get one spoiler-free email
+                with the official 3–5 minute highlight recap — no score, no
+                winner, no push notifications.
               </p>
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link
@@ -268,6 +271,75 @@ export default async function Home() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Built for fans who... */}
+      <section className="mx-auto max-w-3xl px-6 pb-16 sm:pb-20">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-[#f7f5ef] sm:text-3xl">
+          Built for fans who:
+        </h2>
+        <ul className="mx-auto mt-8 max-w-2xl space-y-3 text-[#a8a299]">
+          {[
+            "Live in a different time zone",
+            "Cannot watch games live",
+            "Want official MLB highlights without spoilers",
+            "Hate getting scores spoiled by ESPN, MLB, Twitter/X, or push notifications",
+            "Want to casually follow a team without opening a sports app",
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="mt-2 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#3f6e57]"
+              />
+              <span className="text-base">{item}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Spoiler-safe promise */}
+      <section className="border-y border-[#1f3a2c] bg-[#0f1311]/60">
+        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-20">
+          <div className="rounded-2xl border border-[#3f6e57]/50 bg-[#0f2a1f]/60 p-8 sm:p-10">
+            <div className="flex items-center gap-3">
+              <DiamondGlyph size={28} />
+              <h2 className="text-xl font-bold tracking-tight text-[#f7f5ef] sm:text-2xl">
+                Spoiler-safe promise
+              </h2>
+            </div>
+            <p className="mt-5 text-base leading-relaxed text-[#a8a299] sm:text-lg">
+              No scores, no winner, no losing pitcher, no &ldquo;walk-off win&rdquo;
+              language, no comeback hints, and no subject lines that give away
+              what happened. The email and delivery are spoiler-free; the
+              video is the official MLB recap, which of course shows the score
+              once you press play — you decide when that happens.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Founder story */}
+      <section className="mx-auto max-w-3xl px-6 py-20 text-center">
+        <h2 className="text-2xl font-bold tracking-tight text-[#f7f5ef] sm:text-3xl">
+          Why I built this
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-[#a8a299]">
+          I live in Europe and follow MLB. By the time I woke up, every sports
+          app had already spoiled the score. So I built the email I wanted:
+          one safe link to the official recap.
+        </p>
+        {tipUrl && (
+          <p className="mt-6 text-sm">
+            <a
+              href={tipUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-lg border border-[#3f6e57] px-5 py-2 font-semibold text-[#f7f5ef] hover:border-[#b8312f] hover:text-[#b8312f] transition"
+            >
+              Tip the developer
+            </a>
+          </p>
+        )}
       </section>
 
       {/* Stat strip */}
@@ -325,31 +397,6 @@ export default async function Home() {
           </div>
           <SampleVideoPlayer />
         </div>
-      </section>
-
-      {/* Built by a fan */}
-      <section className="mx-auto max-w-3xl px-6 py-20 text-center">
-        <h2 className="text-2xl font-bold tracking-tight text-[#f7f5ef] sm:text-3xl">
-          Built by a fan, for fans
-        </h2>
-        <p className="mt-5 text-[#a8a299]">
-          I built Ninth Inning Email because I kept getting scores spoiled
-          before I could watch the recap — push notifications, group chats,
-          the home page of every sports site. So I made the email I wanted:
-          one link, no score, no fuss.
-        </p>
-        {tipUrl && (
-          <p className="mt-6 text-sm">
-            <a
-              href={tipUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block rounded-lg border border-[#3f6e57] px-5 py-2 font-semibold text-[#f7f5ef] hover:border-[#b8312f] hover:text-[#b8312f] transition"
-            >
-              Tip the developer
-            </a>
-          </p>
-        )}
       </section>
 
       {/* FAQ */}
