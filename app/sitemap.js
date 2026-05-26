@@ -15,6 +15,11 @@ export default function sitemap() {
       priority: 0.7,
     })),
     {
+      url: `${SITE_URL}/recaps`,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
       url: `${SITE_URL}/privacy`,
       changeFrequency: "yearly",
       priority: 0.3,

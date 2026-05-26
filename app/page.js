@@ -515,6 +515,15 @@ export default async function Home() {
               <SampleVideoPlayer />
             </FlowStep>
           </div>
+
+          <div className="mt-14 text-center">
+            <Link
+              href="/recaps"
+              className="text-sm font-medium text-[#7fb295] underline-offset-4 transition hover:text-[#f7f5ef] hover:underline"
+            >
+              Browse the last 14 days of recaps &rarr;
+            </Link>
+          </div>
         </div>
       </section>
 
