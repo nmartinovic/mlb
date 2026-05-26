@@ -19,15 +19,47 @@ const SAMPLE_RECAP_URL =
 // a path in /public or an absolute URL alongside SAMPLE_RECAP_URL.
 const SAMPLE_RECAP_POSTER = "";
 
-function EmailPreview({ size = "sm", showInboxRow = false }) {
+function InboxRowPreview() {
   const team = TEAMS_BY_ID[PREVIEW_TEAM_ID];
-  const lastName = team.name.split(" ").slice(-1)[0];
-  const today = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-  });
+  // Production subject format from buildRecapSubject in lib/cron-jobs.js:
+  //   `${teamName} Highlights — ${formatDisplayDate(gameDate)}`
+  const subject = `${team.name} Highlights — ${new Date().toLocaleDateString(
+    "en-US",
+    { month: "long", day: "numeric" }
+  )}`;
   const shortDate = new Date().toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
+  });
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
+      <div className="flex items-start gap-3 px-4 py-3">
+        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg">
+          <DiamondGlyph size={32} title="ninthinning.email" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-sm font-semibold text-gray-900">
+              Ninth Inning Email
+            </span>
+            <span className="flex-shrink-0 text-[11px] text-gray-500">
+              {shortDate}
+            </span>
+          </div>
+          <div className="truncate text-sm text-gray-800">{subject}</div>
+          <div className="truncate text-xs text-gray-500">
+            Your spoiler-free game recap is waiting for you.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailPreview({ size = "sm" }) {
+  const team = TEAMS_BY_ID[PREVIEW_TEAM_ID];
+  const today = new Date().toLocaleDateString("en-US", {
+    month: "long",
     day: "numeric",
   });
   const isLarge = size === "lg";
@@ -43,31 +75,6 @@ function EmailPreview({ size = "sm", showInboxRow = false }) {
           Preview
         </span>
       </div>
-      {showInboxRow && (
-        <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
-          <div className="flex items-start gap-3 px-4 py-3">
-            <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg">
-              <DiamondGlyph size={32} title="ninthinning.email" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm font-semibold text-gray-900">
-                  Ninth Inning Email
-                </span>
-                <span className="flex-shrink-0 text-[11px] text-gray-500">
-                  {shortDate}
-                </span>
-              </div>
-              <div className="truncate text-sm text-gray-800">
-                {lastName} highlights are ready
-              </div>
-              <div className="truncate text-xs text-gray-500">
-                Your spoiler-free recap is one click away — no score in sight.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       <div className="overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/10">
         <div
           className="h-1.5"
@@ -136,6 +143,84 @@ function Stat({ value, label }) {
   );
 }
 
+function HighlightsPagePreview() {
+  const team = TEAMS_BY_ID[PREVIEW_TEAM_ID];
+  const today = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
+  return (
+    <div className="mx-auto w-full max-w-md sm:max-w-lg">
+      <div className="mb-2 flex items-center justify-center">
+        <span className="rounded-full border border-[#1f3a2c] bg-[#0f2a1f]/60 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[#a8a299]">
+          Preview
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-[#1f3a2c] bg-[#0a1612]">
+        <div className="flex items-center justify-between border-b border-[#1f3a2c] px-5 py-3">
+          <span className="text-[13px] text-[#f7f5ef]">
+            <BrandLockup glyphSize={20} dark />
+          </span>
+          <span className="text-[11px] text-[#a8a299]">ninthinning.email</span>
+        </div>
+        <div className="px-6 py-6">
+          <div className="flex items-center justify-between">
+            <span
+              className="inline-block rounded px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white"
+              style={{ backgroundColor: team.color }}
+            >
+              {team.abbr}
+            </span>
+            <span className="text-[11px] uppercase tracking-wider text-[#a8a299]">
+              {today}
+            </span>
+          </div>
+          <h3 className="mt-3 text-xl font-bold tracking-tight text-[#f7f5ef]">
+            {team.name} highlights
+          </h3>
+          <p className="mt-1 text-sm text-[#a8a299]">
+            Your spoiler-free game recap — no score, just the plays.
+          </p>
+          <div
+            className="mt-5 overflow-hidden rounded-lg border"
+            style={{ borderColor: team.color }}
+          >
+            <div
+              className="h-1.5"
+              style={{ backgroundColor: team.color }}
+              aria-hidden="true"
+            />
+            <div className="flex aspect-video w-full items-center justify-center bg-black/80">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30">
+                <span className="ml-1 text-xl text-white">&#9654;</span>
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-[11px] text-[#a8a299]">
+            Score only appears once you press play
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlowStep({ n, title, children }) {
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3f6e57] text-xs font-semibold text-[#f7f5ef]">
+          {n}
+        </div>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-[#f7f5ef]">
+          {title}
+        </h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function SampleVideoPlayer() {
   const isMp4 =
     typeof SAMPLE_RECAP_URL === "string" &&
@@ -143,10 +228,7 @@ function SampleVideoPlayer() {
     /\.mp4(\?|$)/i.test(SAMPLE_RECAP_URL);
 
   return (
-    <div className="mx-auto mt-10 max-w-2xl">
-      <p className="mb-4 text-center text-sm text-[#a8a299]">
-        Here&apos;s an example of what you&apos;ll watch:
-      </p>
+    <div className="mx-auto max-w-2xl">
       <div className="overflow-hidden rounded-xl border border-[#1f3a2c]">
         <div className="h-1.5 bg-[#2d5a3d]" aria-hidden="true" />
         {isMp4 ? (
@@ -358,24 +440,34 @@ export default async function Home() {
             How it works
           </h2>
           <p className="mt-3 text-[#a8a299]">
-            Three steps. No app to install. No score in sight.
+            Five steps from sign-up to spoiler-free recap.
           </p>
         </div>
-        <div className="mt-12 grid gap-5 sm:grid-cols-3">
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <StepCard
             n="1"
-            title="Pick your teams"
-            body="Follow one or all 30 MLB teams."
+            title="You pick your teams"
+            body="Follow one or all 30 MLB teams from the dashboard."
           />
           <StepCard
             n="2"
-            title="Check your inbox"
-            body="The morning after the game, a spoiler-free email lands in your inbox with a direct link to the recap."
+            title="The next morning, you get an email"
+            body="One email per team, per game day — usually before 9am ET."
           />
           <StepCard
             n="3"
-            title="Watch the game (or don't)"
-            body="A 3–5 minute official MLB game recap, on a page we host. The email and subject are spoiler-free — you decide when to press play."
+            title="The subject and preview don't reveal the score"
+            body="No score, no winner, no walk-off language. Safe to scan in the inbox."
+          />
+          <StepCard
+            n="4"
+            title="You click through to the official recap"
+            body="The button opens a branded page on ninthinning.email — still no score on screen."
+          />
+          <StepCard
+            n="5"
+            title="You watch the highlights without knowing who won"
+            body="A 3–5 minute official MLB game recap. The score only appears once you press play."
           />
         </div>
       </section>
@@ -388,14 +480,41 @@ export default async function Home() {
               Here&apos;s what lands in your inbox
             </h2>
             <p className="mt-3 text-[#a8a299]">
-              One link. No score, no spoilers — just a 3–5 minute official
-              MLB recap waiting for when you&apos;re ready.
+              From the inbox row to the recap video — audit the spoiler
+              safety with your own eyes.
             </p>
           </div>
-          <div className="mt-12">
-            <EmailPreview size="lg" showInboxRow />
+
+          <div className="mt-14 space-y-14">
+            <FlowStep n="1" title="The inbox row">
+              <div className="mx-auto max-w-md">
+                <InboxRowPreview />
+              </div>
+              <p className="mx-auto mt-4 max-w-md text-center text-xs text-[#a8a299]">
+                Subject and preview text — no score, no winner, nothing about
+                what happened.
+              </p>
+            </FlowStep>
+
+            <FlowStep n="2" title="The opened email">
+              <EmailPreview size="lg" />
+              <p className="mx-auto mt-4 max-w-md text-center text-xs text-[#a8a299]">
+                One button. Still no score in sight.
+              </p>
+            </FlowStep>
+
+            <FlowStep n="3" title="The branded highlights page">
+              <HighlightsPagePreview />
+              <p className="mx-auto mt-4 max-w-md text-center text-xs text-[#a8a299]">
+                The button opens a page on ninthinning.email — not a sports
+                site that might spoil the score on the way.
+              </p>
+            </FlowStep>
+
+            <FlowStep n="4" title="The recap video">
+              <SampleVideoPlayer />
+            </FlowStep>
           </div>
-          <SampleVideoPlayer />
         </div>
       </section>
 
