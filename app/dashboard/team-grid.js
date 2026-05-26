@@ -1,14 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { track } from "@/lib/analytics";
+import { TEAMS_BY_SLUG } from "@/lib/teams";
 
 export default function TeamGrid({ teams, followedIds: initialFollowed }) {
   const [followed, setFollowed] = useState(new Set(initialFollowed));
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectHandled = useRef(false);
+
+  // Pre-select from /teams/[slug] CTA. The team-landing pages (#195) thread a
+  // ?team=<slug> param through login → callback → here; if the user isn't
+  // already following that team we follow it once and strip the param so a
+  // refresh doesn't re-trigger.
+  useEffect(() => {
+    if (preselectHandled.current) return;
+    const slug = searchParams.get("team");
+    if (!slug) return;
+    preselectHandled.current = true;
+    const team = TEAMS_BY_SLUG[slug];
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("team");
+    const nextUrl = params.toString() ? `/dashboard?${params}` : "/dashboard";
+    if (team && !followed.has(team.id)) {
+      toggle(team.id).finally(() => router.replace(nextUrl));
+    } else {
+      router.replace(nextUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function toggle(teamId) {
     const supabase = createClient();

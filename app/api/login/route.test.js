@@ -151,4 +151,37 @@ describe("POST /api/login", () => {
     expect(res.status).toBe(200);
     expect(signInWithOtp).toHaveBeenCalledTimes(1);
   });
+
+  it("appends ?team=<slug> to emailRedirectTo for a known slug (#195)", async () => {
+    const { POST } = await import("./route");
+
+    const res = await POST(
+      makeRequest({ email: "user@example.com", team: "mariners" })
+    );
+
+    expect(res.status).toBe(200);
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: "user@example.com",
+      options: {
+        emailRedirectTo:
+          "https://ninthinning.email/auth/callback?team=mariners",
+      },
+    });
+  });
+
+  it("drops an unknown team slug rather than reflecting it back", async () => {
+    const { POST } = await import("./route");
+
+    const res = await POST(
+      makeRequest({ email: "user@example.com", team: "not-a-team" })
+    );
+
+    expect(res.status).toBe(200);
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: "user@example.com",
+      options: {
+        emailRedirectTo: "https://ninthinning.email/auth/callback",
+      },
+    });
+  });
 });

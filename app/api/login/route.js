@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-server";
+import { TEAMS_BY_SLUG } from "@/lib/teams";
 import { NextResponse } from "next/server";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -60,9 +61,19 @@ export async function POST(request) {
 
   const origin = process.env.SITE_URL || new URL(request.url).origin;
 
+  // Team-landing CTAs (#195) pass a team slug so the dashboard can pre-select
+  // it on first load. Validate against the slug table — anything unknown is
+  // silently dropped rather than reflected back into the redirect URL.
+  const teamSlug =
+    typeof payload?.team === "string" && TEAMS_BY_SLUG[payload.team]
+      ? payload.team
+      : null;
+  const callbackUrl = new URL(`${origin}/auth/callback`);
+  if (teamSlug) callbackUrl.searchParams.set("team", teamSlug);
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${origin}/auth/callback` },
+    options: { emailRedirectTo: callbackUrl.toString() },
   });
 
   if (error) {
