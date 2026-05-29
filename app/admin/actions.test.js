@@ -8,6 +8,7 @@ const hoisted = vi.hoisted(() => ({
   adminSupabase: null,
   sendEmailImpl: vi.fn(),
   fetchStandingsImpl: vi.fn(),
+  fetchNextGameImpl: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -32,6 +33,7 @@ vi.mock("@/lib/mlb", async () => {
   return {
     ...actual,
     fetchStandings: (...args) => hoisted.fetchStandingsImpl(...args),
+    fetchNextGame: (...args) => hoisted.fetchNextGameImpl(...args),
   };
 });
 
@@ -133,6 +135,7 @@ beforeEach(() => {
   hoisted.authUser = { id: ADMIN_ID, email: ADMIN_EMAIL };
   hoisted.sendEmailImpl = vi.fn(async () => undefined);
   hoisted.fetchStandingsImpl = vi.fn(async () => ({ records: [] }));
+  hoisted.fetchNextGameImpl = vi.fn(async () => null); // default: no next game
   hoisted.adminSupabase = null;
 });
 
@@ -196,6 +199,37 @@ describe("resendLatestRecapAction", () => {
     expect(html).toContain("New York Yankees");
     // The recap CTA routes through our branded highlights page (#77).
     expect(html).toContain(`/highlights/${gamePk}`);
+  });
+
+  it("includes the next-game line when fetchNextGame returns a result (#203)", async () => {
+    const gamePk = 778899;
+    hoisted.adminSupabase = makeSupabaseStub({
+      mlb_sent_notifications: {
+        data: { game_pk: gamePk, sent_at: "2026-05-10T03:00:00Z" },
+        error: null,
+      },
+      mlb_game_cache: {
+        data: {
+          game_pk: gamePk,
+          team_id: 147,
+          game_date: "2026-05-09",
+          highlight_url: "https://mlb.com/video/yankees-recap",
+        },
+        error: null,
+      },
+    });
+    // Yankees (147) next game: home vs. Red Sox (111)
+    hoisted.fetchNextGameImpl.mockResolvedValue({
+      gameDate: "2026-05-11T23:05:00Z",
+      opponentId: 111,
+      isHome: true,
+    });
+
+    await resendLatestRecapAction(null, null);
+
+    const [, , html] = hoisted.sendEmailImpl.mock.calls[0];
+    expect(html).toContain("Next up:");
+    expect(html).toContain("vs. Red Sox");
   });
 
   it("is blocked when EMAILS_PAUSED is set", async () => {
