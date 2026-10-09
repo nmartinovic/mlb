@@ -26,13 +26,33 @@ export async function middleware(request) {
   );
 
   // Refresh the auth token on every request
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Real 307 for signed-out dashboard visits. The page's own redirect("/login")
+  // still backstops this, but it arrives as a streamed meta-refresh once the
+  // (now synchronous) root layout has flushed.
+  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   return response;
 }
 
+// Only routes that read the session server-side. Middleware runs inside the
+// same Worker invocation as the page, so matching every path (as it once did)
+// spent CPU on each marketing-page and crawler hit — the Workers Free plan
+// allows 10ms per invocation. Public pages that read Supabase use the
+// cookie-free client in lib/supabase-public.js, so they need no refresh here.
+// Add a path when a new server component or route calls getUser().
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/auth/:path*",
+    "/api/account",
+    "/api/welcome",
+    "/api/auth/:path*",
   ],
 };

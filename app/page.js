@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TEAMS_BY_ID } from "@/lib/teams";
-import { createClient } from "@/lib/supabase-server";
+import AuthAwareLink from "@/components/auth-aware-link";
 import { BrandLockup, DiamondGlyph } from "@/components/brand";
 
 export const metadata = {
@@ -279,17 +279,18 @@ function FaqItem({ q, children }) {
   );
 }
 
-export default async function Home() {
+// Prerendered static page — no server-side session check (see "Worker CPU
+// budget" in CLAUDE.md). Signed-in variants of links swap in client-side.
+const DASHBOARD_LINK = { href: "/dashboard", label: "Dashboard" };
+const SIGN_IN_LINK = { href: "/login", label: "Sign in" };
+const CTA_SIGNED_IN = { href: "/dashboard", label: "Manage my teams" };
+const CTA_SIGNED_OUT = {
+  href: "/login?next=signup",
+  label: "Get my team's next spoiler-free recap",
+};
+
+export default function Home() {
   const tipUrl = process.env.TIP_URL;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isSignedIn = Boolean(user);
-  const ctaHref = isSignedIn ? "/dashboard" : "/login?next=signup";
-  const ctaLabel = isSignedIn
-    ? "Manage my teams"
-    : "Get my team's next spoiler-free recap";
 
   return (
     <div className="min-h-screen">
@@ -298,12 +299,11 @@ export default async function Home() {
         <Link href="/" aria-label="ninthinning.email" className="text-[15px] text-[#f7f5ef]">
           <BrandLockup glyphSize={28} dark />
         </Link>
-        <Link
-          href={isSignedIn ? "/dashboard" : "/login"}
+        <AuthAwareLink
+          signedIn={DASHBOARD_LINK}
+          signedOut={SIGN_IN_LINK}
           className="text-sm font-medium text-[#a8a299] hover:text-[#f7f5ef] transition"
-        >
-          {isSignedIn ? "Dashboard" : "Sign in"}
-        </Link>
+        />
       </header>
 
       {/* Hero */}
@@ -331,12 +331,11 @@ export default async function Home() {
                 winner, no push notifications.
               </p>
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
-                <Link
-                  href={ctaHref}
+                <AuthAwareLink
+                  signedIn={CTA_SIGNED_IN}
+                  signedOut={CTA_SIGNED_OUT}
                   className="w-full rounded-lg bg-[#b8312f] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#a02825] transition sm:w-auto"
-                >
-                  {ctaLabel}
-                </Link>
+                />
                 <a
                   href="#sample"
                   className="text-sm font-medium text-[#a8a299] hover:text-[#f7f5ef] transition"
@@ -609,12 +608,11 @@ export default async function Home() {
             rest.
           </p>
           <div className="mt-8 flex justify-center">
-            <Link
-              href={ctaHref}
+            <AuthAwareLink
+              signedIn={CTA_SIGNED_IN}
+              signedOut={CTA_SIGNED_OUT}
               className="rounded-lg bg-[#b8312f] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#a02825] transition"
-            >
-              {ctaLabel}
-            </Link>
+            />
           </div>
         </div>
       </section>
@@ -627,12 +625,11 @@ export default async function Home() {
             sponsored by MLB or any MLB club. Video links courtesy of MLB.com.
           </p>
           <div className="flex items-center gap-5">
-            <Link
-              href={isSignedIn ? "/dashboard" : "/login"}
+            <AuthAwareLink
+              signedIn={DASHBOARD_LINK}
+              signedOut={SIGN_IN_LINK}
               className="hover:text-[#f7f5ef] transition"
-            >
-              {isSignedIn ? "Dashboard" : "Sign in"}
-            </Link>
+            />
             <Link href="/privacy" className="hover:text-[#f7f5ef] transition">
               Privacy
             </Link>

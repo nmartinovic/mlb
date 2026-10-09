@@ -203,7 +203,21 @@ Distinct from planned rotation: this is the path you take mid-incident when you 
 
 - Server-side Supabase client uses `supabase-server.js`; admin operations use `supabase-admin.js` (service role key)
 - Auth flow uses Supabase magic links with callback at `app/auth/callback/route.js`
-- Middleware in `middleware.js` handles session refresh
+- Middleware in `middleware.js` handles session refresh — **only** on the routes in its `matcher` (see "Worker CPU budget" below)
+
+## Worker CPU budget
+
+The `mlb` Worker runs on the **Workers Free plan: 10 ms CPU per invocation**, shared by every page view, API call and cron tick. Cloudflare emails "[Action required] Workers CPU limit exceeded" when it's blown repeatedly. Requests over the limit can fail with error 1102. In October 2026 this fired 100+ times a day. Root cause: every public page was server-rendered on every request, at about 20–35 ms of CPU each, for each visitor and crawler hit.
+
+What keeps public pages cheap (measured locally in `workerd`, Worker CPU per request): `/` ≈ 10 ms, `/teams/*` ≈ 4 ms, `/privacy` ≈ 4 ms, `/login` ≈ 3 ms. Before the fix these were 32, 18, 19 and 14 ms.
+
+- **No session reads in the root layout or on marketing pages.** Any `cookies()` / `getUser()` there makes the route dynamic, so it's rendered with React on every request. Signed-in link variants ("Dashboard" vs "Sign in") swap in client-side via `components/auth-aware-link.js`; PostHog `identify()` happens client-side in `app/posthog-provider.js`, which lazy-loads the Supabase browser client only when a session cookie exists (`lib/auth-cookie.js`).
+- **Prerendered pages come from the static-assets incremental cache** (`open-next.config.ts`, with cache interception), not a re-render. The cache is read-only: no ISR / `revalidate`. Pages with live data must `export const dynamic = "force-dynamic"` (`/recaps`, `/highlights/[gamePk]`).
+- **The cache must be populated on every deploy.** Production deploys via Cloudflare Builds' plain `wrangler deploy`, which skips OpenNext's own cache population, so `wrangler.jsonc`'s `build.command` runs `scripts/populate-static-cache.mjs`. Without it, prerendered pages re-render on every request and `/teams/*` (`dynamicParams = false`) **404s**.
+- **Middleware is scoped** to `/dashboard`, `/admin`, `/auth`, `/api/account`, `/api/welcome` and `/api/auth`, the only routes that read the session server-side. It also issues the signed-out `/dashboard` → `/login` 307. Add a path to its `matcher` when a new server component or route calls `getUser()`. Public pages that read Supabase use the cookie-free `createPublicClient()` (`lib/supabase-public.js`). The cookie-bound client would refresh an expired token without being able to persist the rotated cookies.
+- **`TIP_URL` is inlined at build** by `next.config.mjs`, read from `wrangler.jsonc`, because the prerendered homepage can't see runtime `vars`.
+
+Check `npx next build` output after page changes: public marketing routes should be `○`/`●`, not `ƒ`. Still dynamic, and likely over 10 ms per hit: `/dashboard`, `/admin`, `/highlights/[gamePk]`, `/recaps`, and full (non-skipped) cron runs. Watch them in the dashboard: Workers & Pages → `mlb` → Observability, filtered on outcome `exceededCpu`. If these keep tripping the limit, Workers Paid ($5/mo) raises it to 30 s per request.
 
 ## Rate limits on the magic-link flow
 
@@ -407,7 +421,7 @@ In production, the natural test is to `cron.unschedule('main')` for the every-15
 
 ## Product analytics (#94)
 
-Browser-side event tracking via PostHog. The wrapper in `lib/analytics.js` is a no-op when `NEXT_PUBLIC_POSTHOG_KEY` is unset, so dev/test/preview environments don't ship telemetry. Initialization and user identification happen in `app/posthog-provider.js`, mounted from the root layout — `app/layout.js` calls `supabase.auth.getUser()` so PostHog can `identify()` (or `reset()`) on every render.
+Browser-side event tracking via PostHog. The wrapper in `lib/analytics.js` is a no-op when `NEXT_PUBLIC_POSTHOG_KEY` is unset, so dev/test/preview environments don't ship telemetry. Initialization and user identification happen in `app/posthog-provider.js`, mounted from the root layout. It resolves the user client-side (Supabase browser client, lazy-loaded only when a session cookie exists) and calls `identify()` or `reset()` once per page load — the layout deliberately does no server-side `getUser()` (see "Worker CPU budget").
 
 Events currently captured:
 
@@ -428,7 +442,8 @@ It points at `app/highlights/[gamePk]/page.js` — a branded interstitial on
 highest-intent click in the funnel lands on a page we own and can instrument.
 
 - **Public, no auth.** Matches the email-link UX — anyone with the link can
-  view it. Reads `mlb_game_cache` (RLS: publicly readable) for the game.
+  view it. Reads `mlb_game_cache` (RLS: publicly readable) for the game via
+  the cookie-free `createPublicClient()` (see "Worker CPU budget").
 - **Data source.** Keyed only on `game_pk`. The cron always writes a
   `mlb_game_cache` row for every game it emails about, so the row is the
   source of truth. An unknown `game_pk` (or a non-numeric path segment)

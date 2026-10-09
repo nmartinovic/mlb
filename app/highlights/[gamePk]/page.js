@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand";
 import { TEAMS_BY_ID } from "@/lib/teams";
-import { createClient } from "@/lib/supabase-server";
+import { createPublicClient } from "@/lib/supabase-public";
 import {
   extractHighlightUrl,
   extractSeriesContext,
@@ -11,6 +11,10 @@ import {
   formatDisplayDate,
 } from "@/lib/mlb";
 import HighlightsViewTracker from "./view-tracker";
+
+// Live data (mlb_game_cache) — render per request. Without this, Next would
+// treat the page as static (cached) now that it reads no cookies.
+export const dynamic = "force-dynamic";
 
 // Per-game pages carry no SEO value and reference internal game PKs — keep
 // them out of search indexes.
@@ -50,7 +54,7 @@ function seriesLine(seriesContext) {
 // guessing. The highlight URL is normally cached on that row; if the cron wrote
 // the row before MLB published a recap we make one live re-fetch attempt.
 async function loadGame(gamePk) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data: cached } = await supabase
     .from("mlb_game_cache")
     .select("game_pk, team_id, game_date, highlight_url")

@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand";
 import { TEAMS_BY_ID } from "@/lib/teams";
-import { createClient } from "@/lib/supabase-server";
+import { createPublicClient } from "@/lib/supabase-public";
 import { formatDisplayDate } from "@/lib/mlb";
+
+// Live data (mlb_game_cache) — render per request. Without this, Next would
+// treat the page as static (cached) now that it reads no cookies.
+export const dynamic = "force-dynamic";
 
 // The recap archive is the only Ninth Inning page that lists multiple games at
 // once. Spoiler discipline (#196): one team per row, no score column, no
@@ -26,7 +30,7 @@ function isoDaysAgo(days, now = new Date()) {
 }
 
 async function loadRecentRecaps() {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("mlb_game_cache")
     .select("game_pk, team_id, game_date, highlight_url")

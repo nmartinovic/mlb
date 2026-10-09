@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrandLockup, DiamondGlyph } from "@/components/brand";
 import { MLB_TEAMS, TEAMS_BY_SLUG } from "@/lib/teams";
-import { createClient } from "@/lib/supabase-server";
+import AuthAwareLink from "@/components/auth-aware-link";
 
 const SITE_URL = process.env.SITE_URL || "https://ninthinning.email";
 
@@ -39,22 +39,24 @@ export async function generateMetadata({ params }) {
   };
 }
 
+// Prerendered at build time — no server-side session check (see "Worker CPU
+// budget" in CLAUDE.md). Signed-in variants of links swap in client-side.
+const DASHBOARD_LINK = { href: "/dashboard", label: "Dashboard" };
+const SIGN_IN_LINK = { href: "/login", label: "Sign in" };
+
 export default async function TeamLandingPage({ params }) {
   const { slug } = await params;
   const team = TEAMS_BY_SLUG[slug];
   if (!team) notFound();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isSignedIn = Boolean(user);
-  const ctaHref = isSignedIn
-    ? `/dashboard?team=${team.slug}`
-    : `/login?next=signup&team=${team.slug}`;
-  const ctaLabel = isSignedIn
-    ? `Follow the ${team.shortName}`
-    : `Get spoiler-free ${team.shortName} recaps`;
+  const ctaSignedIn = {
+    href: `/dashboard?team=${team.slug}`,
+    label: `Follow the ${team.shortName}`,
+  };
+  const ctaSignedOut = {
+    href: `/login?next=signup&team=${team.slug}`,
+    label: `Get spoiler-free ${team.shortName} recaps`,
+  };
 
   return (
     <div className="min-h-screen">
@@ -66,12 +68,11 @@ export default async function TeamLandingPage({ params }) {
         >
           <BrandLockup glyphSize={28} dark />
         </Link>
-        <Link
-          href={isSignedIn ? "/dashboard" : "/login"}
+        <AuthAwareLink
+          signedIn={DASHBOARD_LINK}
+          signedOut={SIGN_IN_LINK}
           className="text-sm font-medium text-[#a8a299] transition hover:text-[#f7f5ef]"
-        >
-          {isSignedIn ? "Dashboard" : "Sign in"}
-        </Link>
+        />
       </header>
 
       {/* Hero with team color accent */}
@@ -101,13 +102,12 @@ export default async function TeamLandingPage({ params }) {
               notifications.
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Link
-                href={ctaHref}
+              <AuthAwareLink
+                signedIn={ctaSignedIn}
+                signedOut={ctaSignedOut}
                 className="w-full rounded-lg px-6 py-3 text-center text-sm font-semibold text-white shadow-lg transition hover:opacity-90 sm:w-auto"
                 style={{ backgroundColor: team.color }}
-              >
-                {ctaLabel}
-              </Link>
+              />
               <Link
                 href="/#sample"
                 className="text-sm font-medium text-[#a8a299] transition hover:text-[#f7f5ef]"
@@ -184,13 +184,12 @@ export default async function TeamLandingPage({ params }) {
             Sign in with a magic link — we&apos;ll pre-select the {team.shortName} so you can start with one click.
           </p>
           <div className="mt-8 flex justify-center">
-            <Link
-              href={ctaHref}
+            <AuthAwareLink
+              signedIn={ctaSignedIn}
+              signedOut={ctaSignedOut}
               className="rounded-lg px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:opacity-90"
               style={{ backgroundColor: team.color }}
-            >
-              {ctaLabel}
-            </Link>
+            />
           </div>
         </div>
       </section>

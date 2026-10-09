@@ -23,6 +23,14 @@ describe("wrangler.jsonc", () => {
     expect(config.vars?.FROM_EMAIL).toBe("highlights@ninthinning.email");
   });
 
+  it("injects the cron handler and populates the static page cache on every deploy", () => {
+    // Production deploys via plain `wrangler deploy`, which skips OpenNext's
+    // own cache population — without it prerendered pages re-render on every
+    // request (over the Free plan's 10ms CPU budget) and /teams/* 404s.
+    expect(config.build?.command).toContain("node scripts/inject-scheduled.mjs");
+    expect(config.build?.command).toContain("node scripts/populate-static-cache.mjs");
+  });
+
   it("wires both the 15-min main cron and the 9am ET scheduler (#76)", () => {
     expect(config.triggers?.crons).toEqual(["*/15 * * * *", "0 13 * * *"]);
   });

@@ -1,5 +1,4 @@
 import "./globals.css";
-import { createClient } from "@/lib/supabase-server";
 import PostHogProvider from "./posthog-provider";
 
 export const metadata = {
@@ -27,12 +26,10 @@ export const metadata = {
   },
 };
 
-export default async function RootLayout({ children }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+// No session lookup here: reading cookies in the root layout makes every route
+// dynamic, so each page view becomes a full server render — far over the
+// Workers Free plan's 10ms CPU budget. PostHogProvider identifies client-side.
+export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
@@ -49,7 +46,7 @@ export default async function RootLayout({ children }) {
         />
       </head>
       <body className="min-h-screen bg-[#0f1311] text-[#f7f5ef] antialiased">
-        <PostHogProvider userId={user?.id ?? null} userEmail={user?.email ?? null} />
+        <PostHogProvider />
         {children}
       </body>
     </html>
