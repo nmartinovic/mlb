@@ -36,9 +36,15 @@ function makeSupabaseMock({
   anyError = null,
   lastRunRows = [],
   lastRunError = null,
+  // Drives the scheduler-freshness query (a clean `schedule_built` run with
+  // games_processed = 0 inside the last 26h). Default empty = "scheduler not
+  // confirmed", i.e. the pre-existing #109 fall-through behaviour.
+  schedulerRows = [],
+  schedulerError = null,
 } = {}) {
   const inserted = [];
   const updates = [];
+  const schedulerQueries = [];
 
   const handlers = {
     mlb_cron_schedule: () => ({
@@ -52,10 +58,29 @@ function makeSupabaseMock({
       }),
     }),
     mlb_cron_runs: () => ({
-      // Freshness query used by the ?backup=1 gate (cronRanRecently).
       select: () => ({
+        // Freshness query used by the ?backup=1 gate (cronRanRecently).
         order: () => ({
           limit: async () => ({ data: lastRunRows, error: lastRunError }),
+        }),
+        // Scheduler-confirmed-no-games query (#109 follow-up):
+        // .eq(status).eq(games_processed).gte(started_at).limit(1)
+        eq: (statusCol, statusVal) => ({
+          eq: (gamesCol, gamesVal) => ({
+            gte: (startedCol, startedVal) => ({
+              limit: async () => {
+                schedulerQueries.push({
+                  statusCol,
+                  statusVal,
+                  gamesCol,
+                  gamesVal,
+                  startedCol,
+                  startedVal,
+                });
+                return { data: schedulerRows, error: schedulerError };
+              },
+            }),
+          }),
         }),
       }),
       insert: (row) => {
@@ -94,7 +119,7 @@ function makeSupabaseMock({
       return make();
     }),
   };
-  return { client, inserted, updates };
+  return { client, inserted, updates, schedulerQueries };
 }
 
 function makeRequest({ auth = "Bearer secret", backup = false } = {}) {
@@ -244,6 +269,72 @@ describe("GET /api/cron — schedule-aware early return (#76)", () => {
     // Mock has no subscribed teams, so the full run completes with
     // "no_subscribers" — the point is that we got past the early-return
     // instead of writing a skipped_no_wake heartbeat.
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ message: "No subscribed teams" });
+
+    vi.useRealTimers();
+  });
+
+  it("stays a heartbeat when the table is empty in season but the scheduler confirmed a no-games day", async () => {
+    // Regression for the Oct 31 CPU-limit emails: ET month 10 counts as
+    // "in season", the table was empty because today had no games, and every
+    // */15 tick fell through to the full check (~25ms CPU x 96/day, over the
+    // free-tier 10ms cap). A clean zero-game scheduler run proves the empty
+    // table is expected, so the tick should early-return like any no-wake tick.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-31T15:00:00Z"));
+
+    const { client, inserted, updates, schedulerQueries } = makeSupabaseMock({
+      scheduleRows: [],
+      anyRows: [],
+      schedulerRows: [{ id: "sched-1" }],
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      message: "No scheduled wake within window — skipped",
+    });
+    expect(fetchSchedule).not.toHaveBeenCalled();
+    expect(inserted).toEqual([{ status: "running" }]);
+    expect(updates.find((u) => u.status === "skipped_no_wake")).toBeDefined();
+
+    // It must ask for a *clean zero-game* scheduler run in the last 26h —
+    // schedule_partial / schedule_failure must not count as confirmation.
+    expect(schedulerQueries).toHaveLength(1);
+    expect(schedulerQueries[0]).toMatchObject({
+      statusCol: "status",
+      statusVal: "schedule_built",
+      gamesCol: "games_processed",
+      gamesVal: 0,
+      startedCol: "started_at",
+    });
+    const ageMs = Date.now() - new Date(schedulerQueries[0].startedVal).getTime();
+    expect(ageMs).toBe(26 * 60 * 60 * 1000);
+
+    vi.useRealTimers();
+  });
+
+  it("still falls through when the table is empty in season and the scheduler freshness check errors (#109)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-31T15:00:00Z"));
+
+    const { client } = makeSupabaseMock({
+      scheduleRows: [],
+      anyRows: [],
+      schedulerRows: null,
+      schedulerError: { message: "boom" },
+    });
+    createAdminClient.mockReturnValue(client);
+
+    const { GET } = await import("./route");
+    const res = await GET(makeRequest());
+
+    // Fail open: an unreadable freshness check must not drop a day of emails.
+    // Mock has no subscribed teams, so the full run ends in "no_subscribers".
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ message: "No subscribed teams" });
 
